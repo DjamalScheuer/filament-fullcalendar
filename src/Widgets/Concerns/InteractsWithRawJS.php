@@ -61,4 +61,30 @@ trait InteractsWithRawJS
             null
         JS;
     }
+
+    /**
+     * Called when a resource group label is mounted in the resourceTimeline view.
+     * Useful for controlling which resources are initially expanded/collapsed.
+     *
+     * @see https://fullcalendar.io/docs/resource-group-label-render-hooks
+     *
+     * @return string
+     */
+    public function resourceGroupLabelDidMount(): string
+    {
+        return <<<JS
+            null
+        JS;
+    }
+
+    /**
+     * Provide an array of resource IDs that should be initially expanded.
+     * Only works with resourceTimeline view when resources have grouping.
+     *
+     * @return array
+     */
+    public function getInitiallyExpandedResources(): array
+    {
+        return [];
+    }
 }

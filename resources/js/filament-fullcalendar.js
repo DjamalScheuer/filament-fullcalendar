@@ -28,6 +28,8 @@ export default function fullcalendar({
     eventContent,
     eventDidMount,
     eventWillUnmount,
+    resourceGroupLabelDidMount,
+    initiallyExpandedResources,
 }) {
     return {
         init() {
@@ -50,6 +52,26 @@ export default function fullcalendar({
                 eventContent,
                 eventDidMount,
                 eventWillUnmount,
+                resourceGroupLabelDidMount: function(info) {
+                    // First apply any custom callback
+                    if (resourceGroupLabelDidMount && typeof resourceGroupLabelDidMount === 'function') {
+                        resourceGroupLabelDidMount(info);
+                    }
+                    
+                    // Then handle automatic expansion based on initiallyExpandedResources
+                    if (initiallyExpandedResources && initiallyExpandedResources.length > 0) {
+                        // Check if this resource should be initially expanded
+                        if (initiallyExpandedResources.includes(info.groupValue) || 
+                            initiallyExpandedResources.includes(String(info.groupValue))) {
+                            // Find and click the expander element
+                            const expander = info.el.querySelector('.fc-datagrid-expander');
+                            if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
+                                // Only click if it's not already expanded (chevron-down indicates expanded)
+                                expander.click();
+                            }
+                        }
+                    }
+                },
                 events: (info, successCallback, failureCallback) => {
                     this.$wire.fetchEvents({ start: info.startStr, end: info.endStr, timezone: info.timeZone })
                         .then(successCallback)
