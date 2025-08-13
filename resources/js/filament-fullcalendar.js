@@ -118,6 +118,43 @@ export default function fullcalendar({
             window.addEventListener('filament-fullcalendar--next', () => calendar.next())
             window.addEventListener('filament-fullcalendar--today', () => calendar.today())
             window.addEventListener('filament-fullcalendar--goto', (event) => calendar.gotoDate(event.detail.date))
+            
+            // Listener für dynamische Resource-Updates
+            window.addEventListener('update-calendar-resources', (event) => {
+                if (event.detail && event.detail.resources) {
+                    // Aktualisiere Resources ohne kompletten Re-render
+                    calendar.refetchResources()
+                    
+                    // Alternative: Setze neue Resources direkt
+                    // calendar.setOption('resources', event.detail.resources)
+                }
+            })
+            
+            // Livewire Event Listener für Resource Updates
+            Livewire.on('update-calendar-resources', (event) => {
+                console.log('Update calendar resources event received:', event);
+                
+                // Handle array structure from Livewire
+                let resources;
+                if (Array.isArray(event)) {
+                    // Livewire sendet als Array [{resources: [...]}]
+                    resources = event[0]?.resources;
+                } else {
+                    // Falls als Objekt gesendet
+                    resources = event?.resources;
+                }
+                
+                console.log('Extracted resources:', resources);
+                
+                if (resources && Array.isArray(resources)) {
+                    console.log('Updating calendar with', resources.length, 'resources');
+                    calendar.setOption('resources', resources);
+                    calendar.refetchEvents();
+                    console.log('Calendar updated successfully');
+                } else {
+                    console.error('Invalid resources data:', resources);
+                }
+            })
         },
     }
 }
