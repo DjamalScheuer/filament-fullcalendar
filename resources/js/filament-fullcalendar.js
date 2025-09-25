@@ -30,6 +30,7 @@ export default function fullcalendar({
     eventWillUnmount,
     resourceGroupLabelDidMount,
     initiallyExpandedResources,
+    searchConfig,
 }) {
     return {
         init() {
@@ -113,6 +114,11 @@ export default function fullcalendar({
 
             calendar.render()
 
+            // Initialize search functionality if enabled
+            if (searchConfig && searchConfig.enabled) {
+                this.initializeSearch(calendar)
+            }
+
             window.addEventListener('filament-fullcalendar--refresh', () => calendar.refetchEvents())
             window.addEventListener('filament-fullcalendar--prev', () => calendar.prev())
             window.addEventListener('filament-fullcalendar--next', () => calendar.next())
@@ -155,6 +161,153 @@ export default function fullcalendar({
                     console.error('Invalid resources data:', resources);
                 }
             })
+        },
+        
+        initializeSearch(calendar) {
+            const searchInput = document.getElementById('calendar-search-input')
+            const searchResults = document.getElementById('calendar-search-results')
+            
+            if (!searchInput || !searchResults) {
+                return
+            }
+            
+            // Store all events for searching
+            let allEvents = []
+            
+            // Update stored events whenever calendar fetches new events
+            const originalEventsFetch = calendar.getOption('events')
+            calendar.setOption('events', async (info, successCallback, failureCallback) => {
+                try {
+                    const events = await this.$wire.fetchEvents({ 
+                        start: info.startStr, 
+                        end: info.endStr, 
+                        timezone: info.timeZone 
+                    })
+                    
+                    // Store events for search
+                    allEvents = [...allEvents, ...events]
+                    // Remove duplicates based on event id
+                    allEvents = allEvents.filter((event, index, self) =>
+                        index === self.findIndex(e => e.id === event.id)
+                    )
+                    
+                    successCallback(events)
+                } catch (error) {
+                    failureCallback(error)
+                }
+            })
+            
+            // Search functionality
+            let searchTimeout = null
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout)
+                const query = e.target.value.trim()
+                
+                if (query.length === 0) {
+                    searchResults.classList.add('hidden')
+                    return
+                }
+                
+                searchTimeout = setTimeout(() => {
+                    this.performSearch(query, allEvents, calendar, searchResults)
+                }, 300)
+            })
+            
+            // Close search results when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                    searchResults.classList.add('hidden')
+                }
+            })
+            
+            // Listen for calendar-search event
+            document.addEventListener('calendar-search', (e) => {
+                if (e.detail && e.detail.query) {
+                    this.performSearch(e.detail.query, allEvents, calendar, searchResults)
+                }
+            })
+        },
+        
+        performSearch(query, allEvents, calendar, searchResultsContainer) {
+            const searchResults = allEvents.filter(event => {
+                const searchableText = [
+                    event.title || '',
+                    event.description || '',
+                    event.location || ''
+                ].join(' ').toLowerCase()
+                
+                return searchableText.includes(query.toLowerCase())
+            })
+            
+            // Sort by date
+            searchResults.sort((a, b) => new Date(a.start) - new Date(b.start))
+            
+            // Display results
+            const resultsList = searchResultsContainer.querySelector('ul')
+            resultsList.innerHTML = ''
+            
+            if (searchResults.length === 0) {
+                resultsList.innerHTML = '<li class="px-4 py-2 text-gray-500 dark:text-gray-400">No events found</li>'
+                searchResultsContainer.classList.remove('hidden')
+                return
+            }
+            
+            // Show max 10 results
+            searchResults.slice(0, 10).forEach(event => {
+                const li = document.createElement('li')
+                li.className = 'px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer'
+                
+                const eventDate = new Date(event.start)
+                const dateStr = eventDate.toLocaleDateString()
+                const timeStr = eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                
+                li.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-semibold text-gray-900 dark:text-gray-100">${event.title}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">${dateStr} at ${timeStr}</div>
+                            ${event.location ? `<div class="text-xs text-gray-400 dark:text-gray-500">${event.location}</div>` : ''}
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                `
+                
+                li.addEventListener('click', () => {
+                    // Jump to event date
+                    calendar.gotoDate(event.start)
+                    
+                    // Change to appropriate view
+                    const view = calendar.view
+                    if (view.type === 'dayGridMonth' || view.type === 'multiMonthYear') {
+                        // Switch to week or day view for better visibility
+                        calendar.changeView('dayGridWeek')
+                    }
+                    
+                    // Highlight the event
+                    setTimeout(() => {
+                        const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
+                        if (eventEl) {
+                            eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            eventEl.classList.add('fc-event-highlighted')
+                            setTimeout(() => {
+                                eventEl.classList.remove('fc-event-highlighted')
+                            }, 2000)
+                        }
+                    }, 100)
+                    
+                    // Hide search results
+                    searchResultsContainer.classList.add('hidden')
+                    
+                    // Clear search input
+                    document.getElementById('calendar-search-input').value = ''
+                })
+                
+                resultsList.appendChild(li)
+            })
+            
+            searchResultsContainer.classList.remove('hidden')
         },
     }
 }

@@ -93,3 +93,40 @@ html.dark .filament-fullcalendar {
 .filament-fullcalendar .fc-list-sticky .fc-list-day th {
     @apply bg-inherit;
 }
+
+/* Search functionality styles */
+.fc-event-highlighted {
+    animation: pulse 2s ease-in-out;
+    box-shadow: 0 0 15px rgba(var(--primary-500), 0.5);
+    z-index: 1000 !important;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+}
+
+/* Search results dropdown styles */
+#calendar-search-results {
+    max-height: 320px;
+}
+
+#calendar-search-results ul {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#calendar-search-results li {
+    transition: background-color 0.2s ease;
+}
+
+/* Dark mode adjustments for search */
+html.dark .fc-event-highlighted {
+    box-shadow: 0 0 20px rgba(147, 197, 253, 0.5);
+}
