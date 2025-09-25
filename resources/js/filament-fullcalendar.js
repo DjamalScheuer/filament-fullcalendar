@@ -247,7 +247,7 @@ export default function fullcalendar({
             resultsList.innerHTML = ''
             
             if (searchResults.length === 0) {
-                resultsList.innerHTML = '<li class="px-4 py-2 text-gray-500 dark:text-gray-400">No events found</li>'
+                resultsList.innerHTML = '<li class="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">Keine Events gefunden</li>'
                 searchResultsContainer.classList.remove('hidden')
                 return
             }
@@ -255,20 +255,27 @@ export default function fullcalendar({
             // Show max 10 results
             searchResults.slice(0, 10).forEach(event => {
                 const li = document.createElement('li')
-                li.className = 'px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer'
+                li.className = 'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors duration-150'
                 
                 const eventDate = new Date(event.start)
-                const dateStr = eventDate.toLocaleDateString()
-                const timeStr = eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                const dateStr = eventDate.toLocaleDateString('de-DE', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric' 
+                })
+                const timeStr = eventDate.toLocaleTimeString('de-DE', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                })
                 
                 li.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <div class="font-semibold text-gray-900 dark:text-gray-100">${event.title}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">${dateStr} at ${timeStr}</div>
-                            ${event.location ? `<div class="text-xs text-gray-400 dark:text-gray-500">${event.location}</div>` : ''}
+                    <div class="flex justify-between items-center gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="font-semibold text-gray-900 dark:text-gray-100 truncate">${event.title}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">${dateStr} um ${timeStr} Uhr</div>
+                            ${event.location ? `<div class="text-xs text-gray-500 dark:text-gray-500 truncate">${event.location}</div>` : ''}
                         </div>
-                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
                     </div>

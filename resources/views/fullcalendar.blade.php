@@ -4,35 +4,33 @@
 
 <x-filament-widgets::widget>
     <x-filament::section>
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex justify-between items-center mb-4 gap-4">
+            <x-filament-actions::actions :actions="$this->getCachedHeaderActions()" class="shrink-0" />
+            
             @if($this->getSearchConfig()['enabled'] ?? false)
-                <div class="flex items-center gap-2 flex-1 max-w-md">
-                    <div class="relative flex-1">
-                        <input 
-                            type="text" 
-                            id="calendar-search-input"
-                            placeholder="{{ $this->getSearchConfig()['placeholder'] ?? 'Search events...' }}"
-                            wire:model.live.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}ms="searchQuery"
-                            x-data="{ searchResults: [] }"
-                            x-on:input.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}="$dispatch('calendar-search', { query: $event.target.value })"
-                            class="w-full px-4 py-2 pr-10 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                        <svg class="absolute right-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                    </div>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="calendar-search-input"
+                        placeholder="{{ $this->getSearchConfig()['placeholder'] ?? 'Search events...' }}"
+                        wire:model.live.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}ms="searchQuery"
+                        x-data="{ searchResults: [] }"
+                        x-on:input.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}="$dispatch('calendar-search', { query: $event.target.value })"
+                        class="w-64 px-4 py-2 pr-10 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400"
+                    >
+                    <svg class="absolute right-3 top-2.5 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    
                     <div 
                         id="calendar-search-results" 
-                        class="hidden absolute z-50 mt-12 w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700"
+                        class="hidden absolute right-0 z-50 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border dark:border-gray-700"
                         wire:ignore
                     >
                         <ul class="py-2 max-h-64 overflow-y-auto"></ul>
                     </div>
                 </div>
-            @else
-                <div></div>
             @endif
-            <x-filament-actions::actions :actions="$this->getCachedHeaderActions()" class="shrink-0" />
         </div>
 
         <div class="filament-fullcalendar" wire:ignore x-load

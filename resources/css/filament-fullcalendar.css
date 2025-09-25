@@ -114,19 +114,74 @@ html.dark .filament-fullcalendar {
 
 /* Search results dropdown styles */
 #calendar-search-results {
-    max-height: 320px;
+    max-height: 400px;
 }
 
 #calendar-search-results ul {
-    max-height: 300px;
+    max-height: 380px;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+#calendar-search-results ul::-webkit-scrollbar {
+    width: 6px;
+}
+
+#calendar-search-results ul::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#calendar-search-results ul::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 3px;
+}
+
+html.dark #calendar-search-results ul::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.5);
 }
 
 #calendar-search-results li {
-    transition: background-color 0.2s ease;
+    transition: all 0.15s ease;
+    border-bottom: 1px solid rgba(229, 231, 235, 1);
+}
+
+html.dark #calendar-search-results li {
+    border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+#calendar-search-results li:last-child {
+    border-bottom: none;
+}
+
+#calendar-search-results li:hover {
+    background-color: rgba(249, 250, 251, 1);
+}
+
+html.dark #calendar-search-results li:hover {
+    background-color: rgba(55, 65, 81, 0.5);
+}
+
+#calendar-search-results li:active {
+    background-color: rgba(243, 244, 246, 1);
+}
+
+html.dark #calendar-search-results li:active {
+    background-color: rgba(55, 65, 81, 0.7);
 }
 
 /* Dark mode adjustments for search */
 html.dark .fc-event-highlighted {
     box-shadow: 0 0 20px rgba(147, 197, 253, 0.5);
+}
+
+/* Search input dark mode fine-tuning */
+html.dark #calendar-search-input {
+    background-color: rgba(31, 41, 55, 1);
+    border-color: rgba(55, 65, 81, 1);
+}
+
+html.dark #calendar-search-input:focus {
+    background-color: rgba(31, 41, 55, 1);
+    border-color: rgba(99, 102, 241, 0.5);
 }
