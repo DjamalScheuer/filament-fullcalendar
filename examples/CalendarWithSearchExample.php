@@ -9,15 +9,8 @@ class CalendarWithSearchExample extends FullCalendarWidget
 {
     protected static ?string $heading = 'Calendar with Search';
 
-    public function mount(): void
-    {
-        parent::mount();
-        
-        // Enable the search functionality
-        $this->enableSearch(true)
-            ->searchPlaceholder('Search events by title, description or location...')
-            ->searchDebounce(300); // milliseconds
-    }
+    // OPTION 1: Configure search via config() method (RECOMMENDED)
+    // No mount() method needed!
 
     /**
      * Fetch events for the calendar
@@ -154,11 +147,19 @@ class CalendarWithSearchExample extends FullCalendarWidget
     }
 
     /**
-     * Calendar configuration
+     * Calendar configuration with search enabled
      */
     public function config(): array
     {
         return [
+            // Search configuration - NEW!
+            'search' => [
+                'enabled' => true,
+                'placeholder' => 'Search events by title, description or location...',
+                'debounce' => 300, // milliseconds
+            ],
+            
+            // Regular calendar configuration
             'headerToolbar' => [
                 'left' => 'prev,next today',
                 'center' => 'title',
@@ -172,4 +173,17 @@ class CalendarWithSearchExample extends FullCalendarWidget
             'eventDisplay' => 'block',
         ];
     }
+    
+    /* OPTION 2: Configure search via mount() method (if you need more dynamic control)
+    
+    public function mount(): void
+    {
+        parent::mount();
+        
+        // Enable the search functionality
+        $this->enableSearch(true)
+            ->searchPlaceholder('Search events by title, description or location...')
+            ->searchDebounce(300); // milliseconds
+    }
+    */
 }

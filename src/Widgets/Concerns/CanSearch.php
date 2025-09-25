@@ -116,6 +116,18 @@ trait CanSearch
      */
     public function getSearchConfig(): array
     {
+        // Check if search is configured in config() method
+        $config = $this->getConfig();
+        
+        if (isset($config['search']) && is_array($config['search'])) {
+            return array_merge([
+                'enabled' => true,
+                'placeholder' => 'Search events...',
+                'debounce' => 300,
+            ], $config['search']);
+        }
+        
+        // Fallback to trait properties
         return [
             'enabled' => $this->isSearchEnabled(),
             'placeholder' => $this->getSearchPlaceholder(),

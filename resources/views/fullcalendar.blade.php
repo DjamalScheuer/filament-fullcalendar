@@ -5,16 +5,16 @@
 <x-filament-widgets::widget>
     <x-filament::section>
         <div class="flex justify-between items-center mb-4">
-            @if($this->isSearchEnabled())
+            @if($this->getSearchConfig()['enabled'] ?? false)
                 <div class="flex items-center gap-2 flex-1 max-w-md">
                     <div class="relative flex-1">
                         <input 
                             type="text" 
                             id="calendar-search-input"
-                            placeholder="{{ $this->getSearchPlaceholder() }}"
-                            wire:model.live.debounce.{{ $this->getSearchDebounce() }}ms="searchQuery"
+                            placeholder="{{ $this->getSearchConfig()['placeholder'] ?? 'Search events...' }}"
+                            wire:model.live.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}ms="searchQuery"
                             x-data="{ searchResults: [] }"
-                            x-on:input.debounce.{{ $this->getSearchDebounce() }}="$dispatch('calendar-search', { query: $event.target.value })"
+                            x-on:input.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}="$dispatch('calendar-search', { query: $event.target.value })"
                             class="w-full px-4 py-2 pr-10 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                         <svg class="absolute right-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

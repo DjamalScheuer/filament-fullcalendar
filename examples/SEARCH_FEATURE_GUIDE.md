@@ -12,7 +12,9 @@ The Calendar Search feature allows users to search for events within the calenda
 
 ## Basic Usage
 
-### 1. Enable Search in Your Widget
+### Method 1: Enable Search via config() - RECOMMENDED ✨
+
+Simply add the search configuration to your `config()` method:
 
 ```php
 <?php
@@ -23,17 +25,31 @@ use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 
 class MyCalendarWidget extends FullCalendarWidget
 {
-    public function mount(): void
+    public function config(): array
     {
-        parent::mount();
-        
-        // Enable search with default settings
-        $this->enableSearch();
+        return [
+            // Enable search with custom settings
+            'search' => [
+                'enabled' => true,
+                'placeholder' => 'Search events...', // Optional
+                'debounce' => 300, // Optional, in milliseconds
+            ],
+            
+            // Your other calendar configuration
+            'headerToolbar' => [
+                'left' => 'prev,next today',
+                'center' => 'title',
+                'right' => 'dayGridMonth,timeGridWeek,timeGridDay',
+            ],
+            // ... other config options
+        ];
     }
 }
 ```
 
-### 2. Configure Search Options
+### Method 2: Enable Search via mount() - Alternative
+
+If you need more dynamic control, you can use the `mount()` method:
 
 ```php
 public function mount(): void
