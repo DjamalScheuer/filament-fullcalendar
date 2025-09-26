@@ -171,31 +171,34 @@ export default function fullcalendar({
                 return
             }
             
-            // Store all events for searching
-            let allEvents = []
+            // Decide search strategy: prefer server-side if available, else fallback to client-side
+            const canUseServerSearch = this.$wire && typeof this.$wire.searchEvents === 'function'
             
-            // Update stored events whenever calendar fetches new events
-            const originalEventsFetch = calendar.getOption('events')
-            calendar.setOption('events', async (info, successCallback, failureCallback) => {
-                try {
-                    const events = await this.$wire.fetchEvents({ 
-                        start: info.startStr, 
-                        end: info.endStr, 
-                        timezone: info.timeZone 
-                    })
-                    
-                    // Store events for search
-                    allEvents = [...allEvents, ...events]
-                    // Remove duplicates based on event id
-                    allEvents = allEvents.filter((event, index, self) =>
-                        index === self.findIndex(e => e.id === event.id)
-                    )
-                    
-                    successCallback(events)
-                } catch (error) {
-                    failureCallback(error)
-                }
-            })
+            // When falling back to client search, keep an in-memory set of fetched events
+            let allEvents = []
+            if (!canUseServerSearch) {
+                const originalEventsFetch = calendar.getOption('events')
+                calendar.setOption('events', async (info, successCallback, failureCallback) => {
+                    try {
+                        const events = await this.$wire.fetchEvents({ 
+                            start: info.startStr, 
+                            end: info.endStr, 
+                            timezone: info.timeZone 
+                        })
+                        
+                        // Store events for search
+                        allEvents = [...allEvents, ...events]
+                        // Remove duplicates based on event id
+                        allEvents = allEvents.filter((event, index, self) =>
+                            index === self.findIndex(e => e.id === event.id)
+                        )
+                        
+                        successCallback(events)
+                    } catch (error) {
+                        failureCallback(error)
+                    }
+                })
+            }
             
             // Search functionality
             let searchTimeout = null
@@ -209,7 +212,11 @@ export default function fullcalendar({
                 }
                 
                 searchTimeout = setTimeout(() => {
-                    this.performSearch(query, allEvents, calendar, searchResults)
+                    if (canUseServerSearch) {
+                        this.performServerSearch(query, calendar, searchResults)
+                    } else {
+                        this.performClientSearch(query, allEvents, calendar, searchResults)
+                    }
                 }, 300)
             })
             
@@ -223,12 +230,16 @@ export default function fullcalendar({
             // Listen for calendar-search event
             document.addEventListener('calendar-search', (e) => {
                 if (e.detail && e.detail.query) {
-                    this.performSearch(e.detail.query, allEvents, calendar, searchResults)
+                    if (canUseServerSearch) {
+                        this.performServerSearch(e.detail.query, calendar, searchResults)
+                    } else {
+                        this.performClientSearch(e.detail.query, allEvents, calendar, searchResults)
+                    }
                 }
             })
         },
         
-        performSearch(query, allEvents, calendar, searchResultsContainer) {
+        performClientSearch(query, allEvents, calendar, searchResultsContainer) {
             const searchResults = allEvents.filter(event => {
                 const searchableText = [
                     event.title || '',
@@ -242,38 +253,53 @@ export default function fullcalendar({
             // Sort by date
             searchResults.sort((a, b) => new Date(a.start) - new Date(b.start))
             
+            this.renderSearchResults(searchResults, calendar, searchResultsContainer)
+        },
+
+        async performServerSearch(query, calendar, searchResultsContainer) {
+            try {
+                const results = await this.$wire.searchEvents(query)
+                // Expecting an array of events compatible with FullCalendar
+                this.renderSearchResults(results || [], calendar, searchResultsContainer)
+            } catch (error) {
+                // If server search fails, show empty state
+                this.renderSearchResults([], calendar, searchResultsContainer)
+            }
+        },
+
+        renderSearchResults(searchResults, calendar, searchResultsContainer) {
             // Display results
             const resultsList = searchResultsContainer.querySelector('ul')
             resultsList.innerHTML = ''
             
-            if (searchResults.length === 0) {
+            if (!searchResults || searchResults.length === 0) {
                 resultsList.innerHTML = '<li class="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">Keine Events gefunden</li>'
                 searchResultsContainer.classList.remove('hidden')
                 return
             }
             
+            // Sort by date (if not already sorted)
+            searchResults.sort((a, b) => new Date(a.start) - new Date(b.start))
+            
             // Show max 10 results
             searchResults.slice(0, 10).forEach(event => {
                 const li = document.createElement('li')
-                li.className = 'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors duration-150'
+                li.className = 'px-4 py-3 cursor-pointer transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700'
                 
                 const eventDate = new Date(event.start)
-                const dateStr = eventDate.toLocaleDateString('de-DE', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    year: 'numeric' 
-                })
-                const timeStr = eventDate.toLocaleTimeString('de-DE', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                })
+                const dateStr = isNaN(eventDate.getTime())
+                    ? ''
+                    : eventDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                const timeStr = isNaN(eventDate.getTime())
+                    ? ''
+                    : eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
                 
                 li.innerHTML = `
                     <div class="flex justify-between items-center gap-3">
                         <div class="flex-1 min-w-0">
-                            <div class="font-semibold text-gray-900 dark:text-gray-100 truncate">${event.title}</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">${dateStr} um ${timeStr} Uhr</div>
-                            ${event.location ? `<div class="text-xs text-gray-500 dark:text-gray-500 truncate">${event.location}</div>` : ''}
+                            <div class="font-semibold text-gray-900 dark:text-gray-100 truncate">${event.title ?? ''}</div>
+                            ${dateStr ? `<div class=\"text-sm text-gray-600 dark:text-gray-400\">${dateStr}${timeStr ? ` um ${timeStr} Uhr` : ''}</div>` : ''}
+                            ${event.location ? `<div class=\"text-xs text-gray-500 dark:text-gray-500 truncate\">${event.location}</div>` : ''}
                         </div>
                         <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -283,16 +309,17 @@ export default function fullcalendar({
                 
                 li.addEventListener('click', () => {
                     // Jump to event date
-                    calendar.gotoDate(event.start)
+                    if (event.start) {
+                        calendar.gotoDate(event.start)
+                    }
                     
                     // Change to appropriate view
                     const view = calendar.view
                     if (view.type === 'dayGridMonth' || view.type === 'multiMonthYear') {
-                        // Switch to week or day view for better visibility
                         calendar.changeView('dayGridWeek')
                     }
                     
-                    // Highlight the event
+                    // Highlight the event when rendered
                     setTimeout(() => {
                         const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
                         if (eventEl) {
@@ -308,7 +335,8 @@ export default function fullcalendar({
                     searchResultsContainer.classList.add('hidden')
                     
                     // Clear search input
-                    document.getElementById('calendar-search-input').value = ''
+                    const input = document.getElementById('calendar-search-input')
+                    if (input) input.value = ''
                 })
                 
                 resultsList.appendChild(li)
