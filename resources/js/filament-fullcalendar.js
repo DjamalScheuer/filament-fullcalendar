@@ -171,6 +171,31 @@ export default function fullcalendar({
                 return
             }
             
+            // Prepare dropdown positioning to avoid clipping on the right
+            this._search = { input: searchInput, container: searchResults }
+            this._search.positionDropdown = () => {
+                const inputRect = searchInput.getBoundingClientRect()
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+                const maxWidth = Math.min(384, viewportWidth - 16) // 24rem or viewport - 16px
+                const rightOffset = Math.max(8, viewportWidth - inputRect.right) // keep at least 8px from edge
+
+                // Use fixed positioning relative to viewport to bypass overflow clipping
+                searchResults.style.position = 'fixed'
+                searchResults.style.left = 'auto'
+                searchResults.style.right = `${rightOffset}px`
+                searchResults.style.top = `${Math.round(inputRect.bottom + 8)}px`
+                searchResults.style.width = `${Math.round(maxWidth)}px`
+            }
+            
+            const reposition = () => {
+                // Only reposition when visible
+                if (!searchResults.classList.contains('hidden')) {
+                    this._search.positionDropdown()
+                }
+            }
+            window.addEventListener('resize', reposition)
+            window.addEventListener('scroll', reposition, true)
+            
             // Decide search strategy: prefer server-side if available, else fallback to client-side
             const canUseServerSearch = this.$wire && typeof this.$wire.searchEvents === 'function'
             
@@ -268,6 +293,11 @@ export default function fullcalendar({
         },
 
         renderSearchResults(searchResults, calendar, searchResultsContainer) {
+            // Ensure dropdown is positioned to the right of the viewport and not clipped
+            if (this._search && typeof this._search.positionDropdown === 'function') {
+                this._search.positionDropdown()
+            }
+
             // Display results
             const resultsList = searchResultsContainer.querySelector('ul')
             resultsList.innerHTML = ''
