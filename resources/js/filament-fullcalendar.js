@@ -34,6 +34,12 @@ export default function fullcalendar({
 }) {
     return {
         init() {
+            // Remove any non-FullCalendar options from config to avoid runtime warnings
+            const sanitizedConfig = { ...(config || {}) }
+            if (sanitizedConfig && Object.prototype.hasOwnProperty.call(sanitizedConfig, 'search')) {
+                delete sanitizedConfig.search
+            }
+
             /** @type Calendar */
             const calendar = new Calendar(this.$el, {
                 headerToolbar: {
@@ -47,7 +53,7 @@ export default function fullcalendar({
                 timeZone,
                 editable,
                 selectable,
-                ...config,
+                ...sanitizedConfig,
                 locales,
                 eventClassNames,
                 eventContent,
@@ -227,22 +233,26 @@ export default function fullcalendar({
             
             // Search functionality
             let searchTimeout = null
+            let lastSearchToken = 0
             searchInput.addEventListener('input', (e) => {
                 clearTimeout(searchTimeout)
                 const query = e.target.value.trim()
                 
-                if (query.length === 0) {
+                const minChars = (this.searchConfig && Number.isInteger(this.searchConfig.minChars)) ? this.searchConfig.minChars : 2
+                if (query.length < minChars) {
                     searchResults.classList.add('hidden')
                     return
                 }
                 
+                const debounceMs = (this.searchConfig && Number.isInteger(this.searchConfig.debounce)) ? this.searchConfig.debounce : 300
                 searchTimeout = setTimeout(() => {
+                    const token = ++lastSearchToken
                     if (canUseServerSearch) {
-                        this.performServerSearch(query, calendar, searchResults)
+                        this.performServerSearch(query, calendar, searchResults, token, () => lastSearchToken)
                     } else {
-                        this.performClientSearch(query, allEvents, calendar, searchResults)
+                        this.performClientSearch(query, allEvents, calendar, searchResults, token, () => lastSearchToken)
                     }
-                }, 300)
+                }, debounceMs)
             })
             
             // Close search results when clicking outside
@@ -255,16 +265,17 @@ export default function fullcalendar({
             // Listen for calendar-search event
             document.addEventListener('calendar-search', (e) => {
                 if (e.detail && e.detail.query) {
+                    const token = ++lastSearchToken
                     if (canUseServerSearch) {
-                        this.performServerSearch(e.detail.query, calendar, searchResults)
+                        this.performServerSearch(e.detail.query, calendar, searchResults, token, () => lastSearchToken)
                     } else {
-                        this.performClientSearch(e.detail.query, allEvents, calendar, searchResults)
+                        this.performClientSearch(e.detail.query, allEvents, calendar, searchResults, token, () => lastSearchToken)
                     }
                 }
             })
         },
         
-        performClientSearch(query, allEvents, calendar, searchResultsContainer) {
+        performClientSearch(query, allEvents, calendar, searchResultsContainer, token, getLastToken) {
             const searchResults = allEvents.filter(event => {
                 const searchableText = [
                     event.title || '',
@@ -278,15 +289,20 @@ export default function fullcalendar({
             // Sort by date
             searchResults.sort((a, b) => new Date(a.start) - new Date(b.start))
             
+            // Guard against stale responses
+            if (token !== getLastToken()) return
             this.renderSearchResults(searchResults, calendar, searchResultsContainer)
         },
 
-        async performServerSearch(query, calendar, searchResultsContainer) {
+        async performServerSearch(query, calendar, searchResultsContainer, token, getLastToken) {
             try {
-                const results = await this.$wire.searchEvents(query)
+                const limit = (this.searchConfig && Number.isInteger(this.searchConfig.limit)) ? this.searchConfig.limit : 10
+                const results = await this.$wire.searchEvents(query, limit)
+                if (token !== getLastToken()) return
                 // Expecting an array of events compatible with FullCalendar
                 this.renderSearchResults(results || [], calendar, searchResultsContainer)
             } catch (error) {
+                if (token !== getLastToken()) return
                 // If server search fails, show empty state
                 this.renderSearchResults([], calendar, searchResultsContainer)
             }

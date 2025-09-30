@@ -1,5 +1,9 @@
 @php
     $plugin = \Saade\FilamentFullCalendar\FilamentFullCalendarPlugin::get();
+    $config = $this->getConfig();
+    if (is_array($config) && array_key_exists('search', $config)) {
+        unset($config['search']);
+    }
 @endphp
 
 <x-filament-widgets::widget>
@@ -13,7 +17,6 @@
                         type="text" 
                         id="calendar-search-input"
                         placeholder="{{ $this->getSearchConfig()['placeholder'] ?? 'Search events...' }}"
-                        wire:model.live.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}ms="searchQuery"
                         x-data="{ searchResults: [] }"
                         x-on:input.debounce.{{ $this->getSearchConfig()['debounce'] ?? 300 }}="$dispatch('calendar-search', { query: $event.target.value })"
                         class="w-64 pl-10 pr-4 py-2 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400"
@@ -38,7 +41,7 @@
                 plugins: @js($plugin->getPlugins()),
                 schedulerLicenseKey: @js($plugin->getSchedulerLicenseKey()),
                 timeZone: @js($plugin->getTimezone()),
-                config: @js($this->getConfig()),
+                config: @js($config),
                 editable: @json($plugin->isEditable()),
                 selectable: @json($plugin->isSelectable()),
                 eventClassNames: {!! htmlspecialchars($this->eventClassNames(), ENT_COMPAT) !!},

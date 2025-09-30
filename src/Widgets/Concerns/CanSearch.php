@@ -20,6 +20,16 @@ trait CanSearch
     protected int $searchDebounce = 300;
 
     /**
+     * Minimum characters before triggering search
+     */
+    protected int $searchMinChars = 3;
+
+    /**
+     * Maximum number of results to return
+     */
+    protected int $searchLimit = 10;
+
+    /**
      * Enable the search functionality
      */
     public function enableSearch(bool $enabled = true): static
@@ -43,6 +53,24 @@ trait CanSearch
     public function searchDebounce(int $milliseconds): static
     {
         $this->searchDebounce = $milliseconds;
+        return $this;
+    }
+
+    /**
+     * Set the minimum characters required to trigger search
+     */
+    public function searchMinChars(int $minChars): static
+    {
+        $this->searchMinChars = max(1, $minChars);
+        return $this;
+    }
+
+    /**
+     * Set the maximum number of search results to return
+     */
+    public function searchLimit(int $limit): static
+    {
+        $this->searchLimit = max(1, $limit);
         return $this;
     }
 
@@ -71,10 +99,26 @@ trait CanSearch
     }
 
     /**
+     * Get minimum characters before search triggers
+     */
+    public function getSearchMinChars(): int
+    {
+        return $this->searchMinChars;
+    }
+
+    /**
+     * Get maximum number of results to return
+     */
+    public function getSearchLimit(): int
+    {
+        return $this->searchLimit;
+    }
+
+    /**
      * Search events based on query
      * Override this method to implement custom search logic
      */
-    public function searchEvents(string $query): array
+    public function searchEvents(string $query, ?int $limit = null): array
     {
         if (empty($query)) {
             return [];
@@ -107,8 +151,9 @@ trait CanSearch
             return strtotime($a['start']) - strtotime($b['start']);
         });
 
-        // Limit to first 10 results
-        return array_slice($searchResults, 0, 10);
+        // Limit number of results
+        $max = $limit ?? $this->getSearchLimit();
+        return array_slice($searchResults, 0, $max);
     }
 
     /**
@@ -124,6 +169,8 @@ trait CanSearch
                 'enabled' => true,
                 'placeholder' => 'Search events...',
                 'debounce' => 300,
+                'minChars' => 2,
+                'limit' => 10,
             ], $config['search']);
         }
         
@@ -132,6 +179,8 @@ trait CanSearch
             'enabled' => $this->isSearchEnabled(),
             'placeholder' => $this->getSearchPlaceholder(),
             'debounce' => $this->getSearchDebounce(),
+            'minChars' => $this->getSearchMinChars(),
+            'limit' => $this->getSearchLimit(),
         ];
     }
 }
