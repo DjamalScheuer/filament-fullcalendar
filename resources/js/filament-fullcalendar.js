@@ -40,6 +40,24 @@ export default function fullcalendar({
                 delete sanitizedConfig.search
             }
 
+
+            // Restore persisted calendar state (view/date/scroll) from sessionStorage
+            const storageKey = this.getCalendarStorageKey()
+            let savedState = null
+            try {
+                savedState = JSON.parse(window.sessionStorage.getItem(storageKey))
+            } catch (e) {
+                // ignore malformed storage
+            }
+            if (savedState && typeof savedState === 'object') {
+                if (savedState.viewType && !sanitizedConfig.initialView) {
+                    sanitizedConfig.initialView = savedState.viewType
+                }
+                if (savedState.dateStr && !sanitizedConfig.initialDate) {
+                    sanitizedConfig.initialDate = savedState.dateStr
+                }
+            }
+
             /** @type Calendar */
             const calendar = new Calendar(this.$el, {
                 headerToolbar: {
@@ -78,6 +96,22 @@ export default function fullcalendar({
                             }
                         }
                     }
+                },
+                datesSet: (info) => {
+                    // Persist view and date whenever the visible range changes
+                    try { 
+                        // Attach scroll listeners once per render cycle
+                        if (!this._scrollListenersAttached) {
+                            this.attachCalendarScrollListeners()
+                            this._scrollListenersAttached = true
+                        }
+                        this.persistCalendarState(info.view.calendar)
+                        // Restore scroll position only once after initial render
+                        if (!this._scrollRestored) {
+                            this.restoreCalendarScrollPosition()
+                            this._scrollRestored = true
+                        }
+                    } catch (e) { /* no-op */ }
                 },
                 events: (info, successCallback, failureCallback) => {
                     this.$wire.fetchEvents({ start: info.startStr, end: info.endStr, timezone: info.timeZone })
@@ -169,6 +203,118 @@ export default function fullcalendar({
             })
         },
         
+        getCalendarStorageKey() {
+            // Key per page; if you have multiple calendars on one page, consider extending this
+            const path = window.location && window.location.pathname ? window.location.pathname : 'unknown'
+            return `filament-fullcalendar:${path}`
+        },
+
+        persistCalendarState(calendar) {
+            try {
+                const storageKey = this.getCalendarStorageKey()
+                const viewType = calendar.view && calendar.view.type ? calendar.view.type : undefined
+                const date = calendar.getDate ? calendar.getDate() : undefined
+                const dateStr = date instanceof Date ? date.toISOString() : undefined
+
+                // Capture scroll positions where applicable
+                const positions = this.getCalendarScrollPositions()
+
+                const state = {
+                    viewType,
+                    dateStr,
+                    scrollTop: positions.scrollTop,
+                    scrollLeft: positions.scrollLeft,
+                }
+
+                window.sessionStorage.setItem(storageKey, JSON.stringify(state))
+            } catch (e) {
+                // ignore storage errors
+            }
+        },
+
+        getCalendarScrollPositions() {
+            // Try to detect common scrollers for time-based views
+            const result = { scrollTop: null, scrollLeft: null }
+
+            // Vertical scroller in timeGrid/resourceTimeGrid
+            const verticalScroller = this.$el.querySelector('.fc-timegrid-body .fc-scroller, .fc-resource-timegrid .fc-scroller')
+            if (verticalScroller) {
+                result.scrollTop = verticalScroller.scrollTop
+            }
+
+            // Horizontal scroller in timeline views
+            const horizontalScroller = this.$el.querySelector('.fc-timeline-body .fc-scroller')
+            if (horizontalScroller) {
+                result.scrollLeft = horizontalScroller.scrollLeft
+            }
+
+            return result
+        },
+
+        attachCalendarScrollListeners() {
+            const save = () => {
+                // Find the calendar instance via DOM; we know it's the current element's calendar
+                // FullCalendar stores instance on the DOM element via internal refs, but we can reuse persisted date/view via calendar getter
+                // Use the last known calendar by querying the nearest FullCalendar API via dataset not available; fallback to using window._lastCalendar if needed
+                // Simpler: use events to persist view/date; for scroll we just write scroll offsets merged with saved state
+                try {
+                    const storageKey = this.getCalendarStorageKey()
+                    let saved = null
+                    try { saved = JSON.parse(window.sessionStorage.getItem(storageKey)) } catch (_) { /* ignore */ }
+                    const positions = this.getCalendarScrollPositions()
+                    const merged = { ...(saved || {}), ...positions }
+                    window.sessionStorage.setItem(storageKey, JSON.stringify(merged))
+                } catch (e) { /* no-op */ }
+            }
+
+            const throttledSave = (() => {
+                let timeout = null
+                return () => {
+                    if (timeout) return
+                    timeout = setTimeout(() => { timeout = null; save() }, 250)
+                }
+            })()
+
+            const verticalScroller = this.$el.querySelector('.fc-timegrid-body .fc-scroller, .fc-resource-timegrid .fc-scroller')
+            if (verticalScroller && !verticalScroller._ffcScrollBound) {
+                verticalScroller.addEventListener('scroll', throttledSave, { passive: true })
+                verticalScroller._ffcScrollBound = true
+            }
+
+            const horizontalScroller = this.$el.querySelector('.fc-timeline-body .fc-scroller')
+            if (horizontalScroller && !horizontalScroller._ffcScrollBound) {
+                horizontalScroller.addEventListener('scroll', throttledSave, { passive: true })
+                horizontalScroller._ffcScrollBound = true
+            }
+        },
+
+        restoreCalendarScrollPosition() {
+            try {
+                const storageKey = this.getCalendarStorageKey()
+                let saved = null
+                try { saved = JSON.parse(window.sessionStorage.getItem(storageKey)) } catch (_) { /* ignore */ }
+                if (!saved) return
+
+                // Apply saved vertical position
+                if (typeof saved.scrollTop === 'number') {
+                    const verticalScroller = this.$el.querySelector('.fc-timegrid-body .fc-scroller, .fc-resource-timegrid .fc-scroller')
+                    if (verticalScroller) {
+                        verticalScroller.scrollTop = saved.scrollTop
+                    }
+                }
+
+                // Apply saved horizontal position
+                if (typeof saved.scrollLeft === 'number') {
+                    const horizontalScroller = this.$el.querySelector('.fc-timeline-body .fc-scroller')
+                    if (horizontalScroller) {
+                        horizontalScroller.scrollLeft = saved.scrollLeft
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+        },
+
         initializeSearch(calendar) {
             const searchInput = document.getElementById('calendar-search-input')
             const searchResults = document.getElementById('calendar-search-results')
