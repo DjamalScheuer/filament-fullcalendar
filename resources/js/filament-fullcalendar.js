@@ -375,6 +375,52 @@ export default function fullcalendar({
             })
         },
         
+		expandResourceForEventIfAny(event) {
+			try {
+				// Collect possible resource ids from various shapes
+				const ids = new Set()
+				if (event) {
+					if (event.resourceId != null) ids.add(String(event.resourceId))
+					if (Array.isArray(event.resourceIds)) event.resourceIds.forEach(id => ids.add(String(id)))
+					if (event.resource && event.resource.id != null) ids.add(String(event.resource.id))
+					if (event.extendedProps) {
+						if (event.extendedProps.resourceId != null) ids.add(String(event.extendedProps.resourceId))
+						if (Array.isArray(event.extendedProps.resourceIds)) event.extendedProps.resourceIds.forEach(id => ids.add(String(id)))
+					}
+				}
+				if (ids.size === 0) return
+
+				// Try to expand only necessary groups; if we can't find the rows, fall back to expanding all collapsed groups
+				let foundAnyRow = false
+				ids.forEach((rid) => {
+					const row = document.querySelector(`[data-resource-id="${CSS.escape(rid)}"]`)
+					if (row) {
+						foundAnyRow = true
+						// Walk up and expand any collapsed parents if their expander is visible
+						let parent = row.parentElement
+						while (parent) {
+							const expander = parent.querySelector && parent.querySelector('.fc-datagrid-expander')
+							if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
+								expander.click()
+							}
+							parent = parent.parentElement
+						}
+					}
+				})
+
+				// Fallback: expand all collapsed groups so the resource rows become visible
+				if (!foundAnyRow) {
+					document.querySelectorAll('.fc-datagrid-expander').forEach((expander) => {
+						if (!expander.classList.contains('fc-icon-chevron-down')) {
+							expander.click()
+						}
+					})
+				}
+			} catch (e) {
+				// best-effort; ignore DOM issues
+			}
+		},
+
         performClientSearch(query, allEvents, calendar, searchResultsContainer, token, getLastToken) {
             const searchResults = allEvents.filter(event => {
                 const searchableText = [
@@ -473,7 +519,9 @@ export default function fullcalendar({
 					if (typeof calendar.rerenderEvents === 'function') {
 						calendar.rerenderEvents()
 					}
-					// Scroll into view after render
+					// Expand resource groups (if any) so the event row becomes visible
+					setTimeout(() => this.expandResourceForEventIfAny(event), 50)
+					// Scroll into view after render and possible expansion
 					setTimeout(() => {
 						const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
 						if (eventEl) {
@@ -481,7 +529,7 @@ export default function fullcalendar({
 							// Ensure class present if rerender missed
 							eventEl.classList.add('fc-event-highlighted')
 						}
-					}, 100)
+					}, 150)
                     
                     // Hide search results
                     searchResultsContainer.classList.add('hidden')
