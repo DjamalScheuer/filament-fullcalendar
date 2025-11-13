@@ -26,6 +26,23 @@ class ResourceTimelineWidget extends FullCalendarWidget
     }
 
     /**
+     * Example: expand the resource group that contains a specific event.
+     * Replace this logic with your app's lookup (e.g. query DB by $eventId).
+     */
+    public function getResourceGroupsForEvent(string $eventId): array
+    {
+        // Demo mapping: in real usage, resolve $eventId -> resource -> group value
+        $mapping = [
+            '1' => 'building-a',
+            '2' => 'building-b',
+            '3' => 'building-c',
+            '4' => 'building-vip',
+        ];
+
+        return isset($mapping[$eventId]) ? [$mapping[$eventId]] : [];
+    }
+
+    /**
      * Define which resource groups should be initially expanded
      * Return an array of group IDs/values that should be expanded by default
      */

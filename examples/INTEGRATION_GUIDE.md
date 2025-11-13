@@ -69,6 +69,25 @@ php artisan filament:assets
 
 Jetzt werden die angegebenen Abteilungen automatisch ausgeklappt, wenn der Kalender geladen wird.
 
+## Dynamisch Gruppen beim Suchklick ausklappen
+
+Implementiere im Widget eine Methode, die zu einer Event-ID die Ressourcengruppe(n) zurückgibt.
+Diese wird vom Frontend nach dem Klick auf ein Suchergebnis aufgerufen, um gezielt Gruppen zu öffnen.
+
+```php
+public function getResourceGroupsForEvent(string $eventId): array
+{
+    // Beispiel: Event -> User -> Abteilung
+    $event = YourEventModel::where('external_event_id', $eventId)->first();
+    $department = $event?->user?->abteilung;
+
+    return $department ? [$department] : [];
+}
+```
+
+Voraussetzung: Dein Kalender gruppiert Resources z. B. via `resourceGroupField => 'group_name'`,
+und deine Resource-Daten enthalten den passenden Gruppenwert (z. B. Abteilungsname).
+
 ## Erweiterte Beispiele
 
 ### Dynamisch basierend auf Benutzer

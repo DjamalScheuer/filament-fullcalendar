@@ -186,6 +186,23 @@ class StaffAssignmentCalendarWidget extends FullCalendarWidget
         return ['Produktion'];
     }
 
+    /**
+     * Dynamisch die passende Abteilung für ein gefundenes Event ausklappen.
+     * Hier nur ein Beispiel – ersetze die Logik durch deine eigene Zuordnung.
+     */
+    public function getResourceGroupsForEvent(string $eventId): array
+    {
+        // Beispiel: Produktionlisten nach externer Event-ID finden
+        $pl = ProductionList::where('external_event_id', $eventId)->first();
+        if (!$pl) {
+            return [];
+        }
+
+        // Abteilung/Group Name zurückgeben, die im Kalender als group_name verwendet wird
+        $department = $pl->user?->abteilung;
+        return $department ? [$department] : [];
+    }
+
     public function config(): array
     {
         $user = auth()->user();

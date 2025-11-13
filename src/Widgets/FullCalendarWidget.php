@@ -60,4 +60,16 @@ class FullCalendarWidget extends Widget implements HasForms, HasActions
     {
         return [];
     }
+
+    /**
+     * Return a list of resource group values (e.g. department names) that should
+     * be expanded when a searched event is selected.
+     *
+     * Override this in your widget to map an $eventId to its resource group(s).
+     * By default, nothing is expanded.
+     */
+    public function getResourceGroupsForEvent(string $eventId): array
+    {
+        return [];
+    }
 }
