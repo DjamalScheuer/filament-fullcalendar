@@ -40,6 +40,8 @@ export default function fullcalendar({
                 delete sanitizedConfig.search
             }
 
+			// Track currently highlighted event id (persist across re-renders)
+			this._highlightedEventId = null
 
             // Restore persisted calendar state (view/date/scroll) from sessionStorage
             const storageKey = this.getCalendarStorageKey()
@@ -59,6 +61,10 @@ export default function fullcalendar({
                 }
             }
 
+			// Preserve user-provided hooks so we can extend them
+			const userEventClassNames = eventClassNames
+			const userEventDidMount = eventDidMount
+
             /** @type Calendar */
             const calendar = new Calendar(this.$el, {
                 headerToolbar: {
@@ -74,9 +80,42 @@ export default function fullcalendar({
                 selectable,
                 ...sanitizedConfig,
                 locales,
-                eventClassNames,
+				eventClassNames: (info) => {
+					let classes = []
+					// Apply user-provided classes (array or function or string)
+					if (Array.isArray(userEventClassNames)) {
+						classes = classes.concat(userEventClassNames)
+					} else if (typeof userEventClassNames === 'function') {
+						const res = userEventClassNames(info)
+						if (Array.isArray(res)) {
+							classes = classes.concat(res)
+						} else if (typeof res === 'string') {
+							classes.push(res)
+						}
+					} else if (typeof userEventClassNames === 'string') {
+						classes.push(userEventClassNames)
+					}
+					// Add highlight class if this is the selected event
+					if (this._highlightedEventId != null && String(info.event.id) === String(this._highlightedEventId)) {
+						classes.push('fc-event-highlighted')
+					}
+					return classes
+				},
                 eventContent,
-                eventDidMount,
+				eventDidMount: (info) => {
+					// Data attribute to easily find the DOM node of an event
+					if (info && info.el && info.event && info.event.id != null) {
+						info.el.setAttribute('data-event-id', String(info.event.id))
+						// Ensure highlight is applied even if classNames not recalculated
+						if (this._highlightedEventId != null && String(info.event.id) === String(this._highlightedEventId)) {
+							info.el.classList.add('fc-event-highlighted')
+						}
+					}
+					// Call user hook last
+					if (typeof userEventDidMount === 'function') {
+						userEventDidMount(info)
+					}
+				},
                 eventWillUnmount,
                 resourceGroupLabelDidMount: function(info) {
                     // First apply any custom callback
@@ -144,6 +183,20 @@ export default function fullcalendar({
             })
 
             calendar.render()
+
+			// Inject default highlight style once (safe fallback)
+			if (!document.getElementById('fc-event-highlight-style')) {
+				const style = document.createElement('style')
+				style.id = 'fc-event-highlight-style'
+				style.textContent = `
+					.fc-event-highlighted {
+						outline: 2px solid #f59e0b;
+						box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35) inset;
+						border-radius: 4px;
+					}
+				`
+				document.head.appendChild(style)
+			}
 
             // Initialize search functionality if enabled
             if (searchConfig && searchConfig.enabled) {
@@ -412,17 +465,23 @@ export default function fullcalendar({
                         calendar.changeView('dayGridWeek')
                     }
                     
-                    // Highlight the event when rendered
-                    setTimeout(() => {
-                        const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
-                        if (eventEl) {
-                            eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                            eventEl.classList.add('fc-event-highlighted')
-                            setTimeout(() => {
-                                eventEl.classList.remove('fc-event-highlighted')
-                            }, 2000)
-                        }
-                    }, 100)
+					// Persistently highlight the selected event
+					this._highlightedEventId = event.id
+					// Remove any previous highlight from DOM immediately (visual correctness)
+					document.querySelectorAll('.fc-event-highlighted').forEach(el => el.classList.remove('fc-event-highlighted'))
+					// Re-render events to apply highlight class via hooks
+					if (typeof calendar.rerenderEvents === 'function') {
+						calendar.rerenderEvents()
+					}
+					// Scroll into view after render
+					setTimeout(() => {
+						const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
+						if (eventEl) {
+							eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+							// Ensure class present if rerender missed
+							eventEl.classList.add('fc-event-highlighted')
+						}
+					}, 100)
                     
                     // Hide search results
                     searchResultsContainer.classList.add('hidden')
