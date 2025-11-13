@@ -455,6 +455,11 @@ export default function fullcalendar({
 			const delayMs = 200
 			const resourceIds = this.resolveEventResourceIds(calendar, event)
 			if (Array.isArray(resourceIds) && resourceIds.length > 0) {
+				// Also try to expand by group values if grouped resources are used
+				const groupValues = this.resolveGroupValuesForResourceIds(calendar, resourceIds)
+				if (Array.isArray(groupValues) && groupValues.length > 0) {
+					this.expandGroupsByValues.call(this, groupValues)
+				}
 				this.expandResourceForEventIfAny.call(this, resourceIds)
 				return
 			}
@@ -502,6 +507,78 @@ export default function fullcalendar({
 			} catch (e) {
 				console.warn('[filament-fullcalendar] expandResourceForEventIfAny: error', e)
 				// best-effort; ignore DOM issues
+			}
+		},
+
+		resolveGroupValuesForResourceIds(calendar, resourceIds) {
+			const values = new Set()
+			try {
+				const groupField = calendar && typeof calendar.getOption === 'function'
+					? (calendar.getOption('resourceGroupField') || 'group')
+					: 'group'
+				
+				const collectFromResourceApi = (resApi) => {
+					if (!resApi) return
+					const ep = resApi.extendedProps || {}
+					const v = ep[groupField] ?? resApi[groupField]
+					if (v != null) values.add(String(v))
+				}
+				
+				if (Array.isArray(resourceIds) && resourceIds.length > 0) {
+					// Prefer official API if available
+					if (calendar && typeof calendar.getResourceById === 'function') {
+						resourceIds.forEach((id) => {
+							const resApi = calendar.getResourceById(String(id))
+							collectFromResourceApi(resApi)
+						})
+					}
+					
+					// Fallback to static resources option
+					if (values.size === 0 && calendar && typeof calendar.getOption === 'function') {
+						const resOpt = calendar.getOption('resources')
+						if (Array.isArray(resOpt)) {
+							resourceIds.forEach((id) => {
+								const r = resOpt.find(x => String(x.id) === String(id))
+								if (r) {
+                                    const v = (r.extendedProps && r.extendedProps[groupField] != null)
+                                        ? r.extendedProps[groupField]
+                                        : r[groupField]
+									if (v != null) values.add(String(v))
+								}
+							})
+						}
+					}
+				}
+			} catch (e) {
+				console.warn('[filament-fullcalendar] resolveGroupValuesForResourceIds: error', e)
+			}
+			const out = Array.from(values)
+			console.log('[filament-fullcalendar] resolveGroupValuesForResourceIds:', out)
+			return out
+		},
+		
+		expandGroupsByValues(groupValues) {
+			try {
+				const scope = this.$el || document
+				if (!Array.isArray(groupValues) || groupValues.length === 0) return
+				groupValues.forEach((gv) => {
+					// Find a group label cell with matching text
+					const candidates = Array.from(scope.querySelectorAll('.fc-datagrid .fc-datagrid-cell-main'))
+					const match = candidates.find(el => (el.textContent || '').trim() === String(gv).trim())
+					if (match) {
+						// Find expander in same row/context
+						const row = match.closest('.fc-datagrid-row') || match.parentElement
+						const expander = (row && row.querySelector) ? row.querySelector('.fc-datagrid-expander') : null
+						if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
+							console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
+							expander.click()
+						}
+					} else {
+						console.log('[filament-fullcalendar] expandGroupsByValues: group label not found', gv)
+					}
+				})
+			} catch (e) {
+				console.warn('[filament-fullcalendar] expandGroupsByValues: error', e)
 			}
 		},
 
