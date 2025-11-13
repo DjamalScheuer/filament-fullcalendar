@@ -403,11 +403,68 @@ export default function fullcalendar({
 						}
 					}
 				}
+				// 3) Heuristic match if ID-api not found yet: try by time/title against current calendar events
+				if (ids.size === 0 && calendar && typeof calendar.getEvents === 'function') {
+					const all = calendar.getEvents ? calendar.getEvents() : []
+					// Try by same id (sometimes exists only after async)
+					let candidate = all.find(e => String(e.id) === String(event.id))
+					if (!candidate) {
+						// Try by start and title (loose matching)
+						const targetStart = this.parseDateSafe(event.start)
+						const targetTitle = (event.title || '').toLowerCase()
+						if (targetStart instanceof Date && !isNaN(targetStart)) {
+							candidate = all.find(e => {
+								const s = e.start
+								const t = (e.title || '').toLowerCase()
+								// within 10 minutes and same title
+								const closeInTime = s instanceof Date && Math.abs(s.getTime() - targetStart.getTime()) <= 10 * 60 * 1000
+								return closeInTime && t === targetTitle
+							})
+						}
+					}
+					if (candidate) {
+						if (typeof candidate.getResources === 'function') {
+							const rs = candidate.getResources()
+							rs.forEach(r => { if (r && r.id != null) ids.add(String(r.id)) })
+						}
+						if (candidate._def && Array.isArray(candidate._def.resourceIds)) {
+							candidate._def.resourceIds.forEach(id => ids.add(String(id)))
+						}
+					}
+				}
 			} catch (e) {
 				console.warn('[filament-fullcalendar] resolveEventResourceIds: error', e)
 			}
 			console.log('[filament-fullcalendar] resolveEventResourceIds:', Array.from(ids))
 			return Array.from(ids)
+		},
+		
+		parseDateSafe(value) {
+			if (value instanceof Date) return value
+			if (typeof value === 'string') {
+				// Accept "YYYY-MM-DD HH:mm:ss" by converting space to 'T'
+				const isoish = value.includes(' ') && !value.includes('T') ? value.replace(' ', 'T') : value
+				const d = new Date(isoish)
+				return isNaN(d) ? null : d
+			}
+			return null
+		},
+		
+		tryExpandForEventWithRetries(calendar, event, attempt = 0) {
+			const maxAttempts = 10
+			const delayMs = 200
+			const resourceIds = this.resolveEventResourceIds(calendar, event)
+			if (Array.isArray(resourceIds) && resourceIds.length > 0) {
+				this.expandResourceForEventIfAny.call(this, resourceIds)
+				return
+			}
+			if (attempt >= maxAttempts) {
+				console.warn('[filament-fullcalendar] could not resolve resource for event after retries')
+				return
+			}
+			setTimeout(() => {
+				this.tryExpandForEventWithRetries(calendar, event, attempt + 1)
+			}, delayMs)
 		},
 		
 		expandResourceForEventIfAny(resourceIds) {
@@ -556,10 +613,7 @@ export default function fullcalendar({
 						calendar.rerenderEvents()
 					}
 					// Expand resource groups (if any) so the event row becomes visible
-					setTimeout(() => {
-						const resourceIds = this.resolveEventResourceIds(calendar, event)
-						this.expandResourceForEventIfAny.call(this, resourceIds)
-					}, 200)
+					setTimeout(() => this.tryExpandForEventWithRetries(calendar, event, 0), 200)
 					// Scroll into view after render and expansion
 					setTimeout(() => {
 						const scope = this.$el || document
