@@ -377,6 +377,7 @@ export default function fullcalendar({
         
 		expandResourceForEventIfAny(event) {
 			try {
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: start', { event })
 				// Collect possible resource ids from various shapes
 				const ids = new Set()
 				if (event) {
@@ -386,37 +387,51 @@ export default function fullcalendar({
 					if (event.extendedProps) {
 						if (event.extendedProps.resourceId != null) ids.add(String(event.extendedProps.resourceId))
 						if (Array.isArray(event.extendedProps.resourceIds)) event.extendedProps.resourceIds.forEach(id => ids.add(String(id)))
+						// Common alternative shapes from backends
+						if (event.extendedProps.resource_id != null) ids.add(String(event.extendedProps.resource_id))
 					}
 				}
-				if (ids.size === 0) return
-
-				// Try to expand only necessary groups; if we can't find the rows, fall back to expanding all collapsed groups
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: collected resource ids', Array.from(ids))
+				
+				// Prefer scoping to this calendar element
+				const scope = this.$el || document
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: scope set', { hasEl: !!this.$el })
+				
+				// If we can find the resource row(s), expand their ancestor groups
 				let foundAnyRow = false
-				ids.forEach((rid) => {
-					const row = document.querySelector(`[data-resource-id="${CSS.escape(rid)}"]`)
-					if (row) {
-						foundAnyRow = true
-						// Walk up and expand any collapsed parents if their expander is visible
-						let parent = row.parentElement
-						while (parent) {
-							const expander = parent.querySelector && parent.querySelector('.fc-datagrid-expander')
-							if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
-								expander.click()
+				if (ids.size > 0) {
+					ids.forEach((rid) => {
+						// data-resource-id is present on resource rows in resource views
+						const row = scope.querySelector(`[data-resource-id="${CSS.escape(rid)}"]`)
+						console.log('[filament-fullcalendar] expandResourceForEventIfAny: lookup row', { rid, found: !!row })
+						if (row) {
+							foundAnyRow = true
+							let parent = row.parentElement
+							while (parent) {
+								const expander = parent.querySelector && parent.querySelector('.fc-datagrid-expander')
+								if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
+									console.log('[filament-fullcalendar] expandResourceForEventIfAny: clicking ancestor expander to open')
+									expander.click()
+								}
+								parent = parent.parentElement
 							}
-							parent = parent.parentElement
-						}
-					}
-				})
-
-				// Fallback: expand all collapsed groups so the resource rows become visible
-				if (!foundAnyRow) {
-					document.querySelectorAll('.fc-datagrid-expander').forEach((expander) => {
-						if (!expander.classList.contains('fc-icon-chevron-down')) {
-							expander.click()
 						}
 					})
+					console.log('[filament-fullcalendar] expandResourceForEventIfAny: foundAnyRow', foundAnyRow)
 				}
+
+				// Always ensure all collapsed groups are expanded for reliability in grouped views
+				const allExpanders = scope.querySelectorAll('.fc-datagrid-expander')
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: total expanders', allExpanders.length)
+				allExpanders.forEach((expander) => {
+					if (!expander.classList.contains('fc-icon-chevron-down')) {
+						console.log('[filament-fullcalendar] expandResourceForEventIfAny: clicking expander to ensure open')
+						expander.click()
+					}
+				})
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: done')
 			} catch (e) {
+				console.warn('[filament-fullcalendar] expandResourceForEventIfAny: error', e)
 				// best-effort; ignore DOM issues
 			}
 		},
@@ -500,14 +515,22 @@ export default function fullcalendar({
                 `
                 
                 li.addEventListener('click', () => {
+					console.log('[filament-fullcalendar] search result click', {
+						id: event.id,
+						start: event.start,
+						resourceId: event.resourceId ?? event?.extendedProps?.resourceId ?? event?.extendedProps?.resource_id,
+						resourceIds: event.resourceIds ?? event?.extendedProps?.resourceIds
+					})
                     // Jump to event date
                     if (event.start) {
+						console.log('[filament-fullcalendar] gotoDate', event.start)
                         calendar.gotoDate(event.start)
                     }
                     
                     // Change to appropriate view
                     const view = calendar.view
                     if (view.type === 'dayGridMonth' || view.type === 'multiMonthYear') {
+						console.log('[filament-fullcalendar] changeView to dayGridWeek from', view.type)
                         calendar.changeView('dayGridWeek')
                     }
                     
@@ -517,19 +540,21 @@ export default function fullcalendar({
 					document.querySelectorAll('.fc-event-highlighted').forEach(el => el.classList.remove('fc-event-highlighted'))
 					// Re-render events to apply highlight class via hooks
 					if (typeof calendar.rerenderEvents === 'function') {
+						console.log('[filament-fullcalendar] rerenderEvents() after selecting result')
 						calendar.rerenderEvents()
 					}
 					// Expand resource groups (if any) so the event row becomes visible
-					setTimeout(() => this.expandResourceForEventIfAny(event), 50)
-					// Scroll into view after render and possible expansion
+					setTimeout(() => this.expandResourceForEventIfAny.call(this, event), 150)
+					// Scroll into view after render and expansion
 					setTimeout(() => {
 						const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
+						console.log('[filament-fullcalendar] locating event element after expansion', { found: !!eventEl })
 						if (eventEl) {
 							eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
 							// Ensure class present if rerender missed
 							eventEl.classList.add('fc-event-highlighted')
 						}
-					}, 150)
+					}, 300)
                     
                     // Hide search results
                     searchResultsContainer.classList.add('hidden')
