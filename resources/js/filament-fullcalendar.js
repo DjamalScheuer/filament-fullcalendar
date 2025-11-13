@@ -375,11 +375,10 @@ export default function fullcalendar({
             })
         },
         
-		expandResourceForEventIfAny(event) {
+		resolveEventResourceIds(calendar, event) {
+			const ids = new Set()
 			try {
-				console.log('[filament-fullcalendar] expandResourceForEventIfAny: start', { event })
-				// Collect possible resource ids from various shapes
-				const ids = new Set()
+				// 1) From event payload itself
 				if (event) {
 					if (event.resourceId != null) ids.add(String(event.resourceId))
 					if (Array.isArray(event.resourceIds)) event.resourceIds.forEach(id => ids.add(String(id)))
@@ -387,11 +386,33 @@ export default function fullcalendar({
 					if (event.extendedProps) {
 						if (event.extendedProps.resourceId != null) ids.add(String(event.extendedProps.resourceId))
 						if (Array.isArray(event.extendedProps.resourceIds)) event.extendedProps.resourceIds.forEach(id => ids.add(String(id)))
-						// Common alternative shapes from backends
 						if (event.extendedProps.resource_id != null) ids.add(String(event.extendedProps.resource_id))
 					}
 				}
-				console.log('[filament-fullcalendar] expandResourceForEventIfAny: collected resource ids', Array.from(ids))
+				// 2) From calendar's EventApi (after gotoDate refetched current range)
+				if (ids.size === 0 && calendar && typeof calendar.getEventById === 'function' && event && event.id != null) {
+					const api = calendar.getEventById(String(event.id))
+					if (api) {
+						if (typeof api.getResources === 'function') {
+							const rs = api.getResources()
+							rs.forEach(r => { if (r && r.id != null) ids.add(String(r.id)) })
+						}
+						// Fallback internals (best-effort)
+						if (api._def && Array.isArray(api._def.resourceIds)) {
+							api._def.resourceIds.forEach(id => ids.add(String(id)))
+						}
+					}
+				}
+			} catch (e) {
+				console.warn('[filament-fullcalendar] resolveEventResourceIds: error', e)
+			}
+			console.log('[filament-fullcalendar] resolveEventResourceIds:', Array.from(ids))
+			return Array.from(ids)
+		},
+		
+		expandResourceForEventIfAny(resourceIds) {
+			try {
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: start', { resourceIds })
 				
 				// Prefer scoping to this calendar element
 				const scope = this.$el || document
@@ -399,8 +420,8 @@ export default function fullcalendar({
 				
 				// If we can find the resource row(s), expand their ancestor groups
 				let foundAnyRow = false
-				if (ids.size > 0) {
-					ids.forEach((rid) => {
+				if (Array.isArray(resourceIds) && resourceIds.length > 0) {
+					resourceIds.forEach((rid) => {
 						// data-resource-id is present on resource rows in resource views
 						const row = scope.querySelector(`[data-resource-id="${CSS.escape(rid)}"]`)
 						console.log('[filament-fullcalendar] expandResourceForEventIfAny: lookup row', { rid, found: !!row })
@@ -420,16 +441,7 @@ export default function fullcalendar({
 					console.log('[filament-fullcalendar] expandResourceForEventIfAny: foundAnyRow', foundAnyRow)
 				}
 
-				// Always ensure all collapsed groups are expanded for reliability in grouped views
-				const allExpanders = scope.querySelectorAll('.fc-datagrid-expander')
-				console.log('[filament-fullcalendar] expandResourceForEventIfAny: total expanders', allExpanders.length)
-				allExpanders.forEach((expander) => {
-					if (!expander.classList.contains('fc-icon-chevron-down')) {
-						console.log('[filament-fullcalendar] expandResourceForEventIfAny: clicking expander to ensure open')
-						expander.click()
-					}
-				})
-				console.log('[filament-fullcalendar] expandResourceForEventIfAny: done')
+				console.log('[filament-fullcalendar] expandResourceForEventIfAny: done', { foundAnyRow })
 			} catch (e) {
 				console.warn('[filament-fullcalendar] expandResourceForEventIfAny: error', e)
 				// best-effort; ignore DOM issues
@@ -544,17 +556,21 @@ export default function fullcalendar({
 						calendar.rerenderEvents()
 					}
 					// Expand resource groups (if any) so the event row becomes visible
-					setTimeout(() => this.expandResourceForEventIfAny.call(this, event), 150)
+					setTimeout(() => {
+						const resourceIds = this.resolveEventResourceIds(calendar, event)
+						this.expandResourceForEventIfAny.call(this, resourceIds)
+					}, 200)
 					// Scroll into view after render and expansion
 					setTimeout(() => {
-						const eventEl = document.querySelector(`[data-event-id="${event.id}"]`)
+						const scope = this.$el || document
+						const eventEl = scope.querySelector(`[data-event-id="${event.id}"]`)
 						console.log('[filament-fullcalendar] locating event element after expansion', { found: !!eventEl })
 						if (eventEl) {
 							eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
 							// Ensure class present if rerender missed
 							eventEl.classList.add('fc-event-highlighted')
 						}
-					}, 300)
+					}, 350)
                     
                     // Hide search results
                     searchResultsContainer.classList.add('hidden')
