@@ -647,21 +647,12 @@ export default function fullcalendar({
 								parent = parent.parentElement
 							}
 						}
-					})
-					console.log('[filament-fullcalendar] expandResourceForEventIfAny: foundAnyRow', foundAnyRow)
-				}
+			})
+			console.log('[filament-fullcalendar] expandResourceForEventIfAny: foundAnyRow', foundAnyRow)
+		}
 
-				// Fallback: expand all collapsed groups to ensure visibility
-				const allExpanders = scope.querySelectorAll('.fc-datagrid-expander')
-				console.log('[filament-fullcalendar] expandResourceForEventIfAny: total expanders', allExpanders.length)
-				allExpanders.forEach((expander) => {
-					if (!expander.classList.contains('fc-icon-chevron-down')) {
-						console.log('[filament-fullcalendar] expandResourceForEventIfAny: clicking expander to ensure open')
-						expander.click()
-					}
-				})
-
-				console.log('[filament-fullcalendar] expandResourceForEventIfAny: done', { foundAnyRow })
+		// Note: Fallback to expand all groups removed - only expand groups specified by getResourceGroupsForEvent
+		console.log('[filament-fullcalendar] expandResourceForEventIfAny: done', { foundAnyRow })
 			} catch (e) {
 				console.warn('[filament-fullcalendar] expandResourceForEventIfAny: error', e)
 				// best-effort; ignore DOM issues
