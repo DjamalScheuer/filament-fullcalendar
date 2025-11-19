@@ -399,8 +399,9 @@ export default function fullcalendar({
             try {
                 const storageKey = this.getExpandedGroupsStorageKey()
                 window.sessionStorage.setItem(storageKey, JSON.stringify(groups || []))
+                console.log('[FC] 💾 Saved to sessionStorage:', storageKey, groups)
             } catch (e) {
-                // Ignore storage errors
+                console.error('[FC] ❌ Failed to save:', e)
             }
         },
 
@@ -408,12 +409,13 @@ export default function fullcalendar({
             try {
                 const storageKey = this.getExpandedGroupsStorageKey()
                 const stored = window.sessionStorage.getItem(storageKey)
+                console.log('[FC] 📂 Loading from sessionStorage:', storageKey, stored)
                 if (stored) {
                     const parsed = JSON.parse(stored)
                     return Array.isArray(parsed) ? parsed : []
                 }
             } catch (e) {
-                // Ignore storage errors
+                console.error('[FC] ❌ Failed to load:', e)
             }
             return null
         },
