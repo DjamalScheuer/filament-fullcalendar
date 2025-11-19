@@ -253,19 +253,41 @@ export default function fullcalendar({
                         }
                     })(saveExpanded, 250)
 
-                    // Save only when an expander is clicked; persist if state actually changed
+                    // Save only when an expander is clicked; compute new state from pre-click DOM (reliable)
                     container.addEventListener('click', (evt) => {
-                        const expanderClicked = evt.target && evt.target.closest ? evt.target.closest('.fc-datagrid-expander') : null
-                        if (!expanderClicked) return
-                        // Wait for FullCalendar's toggle to reflect in DOM, then collect and maybe save
-                        setTimeout(() => {
-                            const openGroups = collectOpenGroups()
-                            try { console.debug?.('[filament-fullcalendar] datagrid click, openGroups', openGroups) } catch (_) {}
-                            if (!arraysEqual(openGroups, this._lastSavedOpenGroups || [])) {
-                                this._lastSavedOpenGroups = openGroups
-                                debouncedSave(openGroups)
-                            }
-                        }, 0)
+                        const expander = evt.target && evt.target.closest ? evt.target.closest('.fc-datagrid-expander') : null
+                        if (!expander) return
+
+                        // Identify group value from the same row
+                        const row = expander.closest('.fc-datagrid-row') || expander.parentElement
+                        const labelEl = row ? row.querySelector('[data-group-value]') : null
+                        const groupValue = labelEl ? labelEl.getAttribute('data-group-value') : null
+                        if (!groupValue) return
+
+                        // Determine current (pre-click) state using icon/aria (pre-toggle)
+                        const icon = expander.querySelector('.fc-icon')
+                        const isCollapsedPre = !!(icon && icon.classList.contains('fc-icon-chevron-right')) || expander.getAttribute('aria-expanded') === 'false'
+                        const isExpandedPre = !!(icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
+
+                        // Build next set from last saved set
+                        const last = Array.isArray(this._lastSavedOpenGroups) ? this._lastSavedOpenGroups.slice() : []
+                        const set = new Set(last.map(String))
+
+                        if (isCollapsedPre && !isExpandedPre) {
+                            // Will open
+                            set.add(String(groupValue))
+                        } else {
+                            // Will close (or unknown) – remove to be safe
+                            set.delete(String(groupValue))
+                        }
+
+                        const next = Array.from(set)
+                        try { console.debug?.('[filament-fullcalendar] expander click -> next openGroups', next) } catch (_) {}
+
+                        if (!arraysEqual(next, this._lastSavedOpenGroups || [])) {
+                            this._lastSavedOpenGroups = next
+                            debouncedSave(next)
+                        }
                     }, true)
 
                     // Fallback: observe icon/aria changes to persist state
