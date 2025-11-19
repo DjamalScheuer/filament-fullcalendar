@@ -179,11 +179,17 @@ export default function fullcalendar({
             calendar.render()
 
             // Apply persisted expanded groups shortly after initial render to ensure DOM is ready
-            // (persistedExpandedResources already includes initiallyExpandedResources as fallback)
             try {
-                const expandedResources = Array.isArray(persistedExpandedResources) 
-                    ? persistedExpandedResources.map(v => String(v))
-                    : []
+                // First try sessionStorage, fallback to server-provided persistedExpandedResources
+                let expandedResources = this.getPersistedExpandedGroups()
+                if (expandedResources === null) {
+                    // First visit or storage cleared – use server default (includes initiallyExpandedResources)
+                    expandedResources = Array.isArray(persistedExpandedResources) 
+                        ? persistedExpandedResources.map(v => String(v))
+                        : []
+                    console.log('[filament-fullcalendar] 🆕 first visit, using server default:', expandedResources)
+                }
+                
                 if (expandedResources.length > 0) {
                     // Single pass; robust detection inside expandGroupsByValues prevents toggling
                     setTimeout(() => this.expandGroupsByValues(expandedResources), 120)
@@ -210,10 +216,8 @@ export default function fullcalendar({
                 const container = this.$el
                 if (container) {
                     const saveExpanded = (openGroups) => {
-                        if (this.$wire && typeof this.$wire.saveExpandedGroups === 'function') {
-                            try { console.debug?.('[filament-fullcalendar] saveExpandedGroups', openGroups) } catch (_) {}
-                            this.$wire.saveExpandedGroups(openGroups)
-                        }
+                        // Save to sessionStorage (like view/date persistence)
+                        this.persistExpandedGroups(openGroups)
                     }
                     const collectOpenGroups = () => {
                         const scope = container || document
@@ -310,13 +314,18 @@ export default function fullcalendar({
                         }
                     }, true)
 
-                    // Manual debug hook
+                    // Manual debug hooks
                     try {
                         window.__fcSaveExpandedGroups = () => {
                             const openGroups = collectOpenGroups()
                             console.log('[filament-fullcalendar] 🔧 manual save, openGroups', openGroups)
                             this._lastSavedOpenGroups = openGroups
                             saveExpanded(openGroups)
+                        }
+                        window.__fcClearExpandedGroups = () => {
+                            const key = this.getExpandedGroupsStorageKey()
+                            window.sessionStorage.removeItem(key)
+                            console.log('[filament-fullcalendar] 🗑️ cleared sessionStorage')
                         }
                     } catch (_) {}
                 }
@@ -403,6 +412,36 @@ export default function fullcalendar({
             } catch (e) {
                 // ignore storage errors
             }
+        },
+
+        getExpandedGroupsStorageKey() {
+            const path = window.location && window.location.pathname ? window.location.pathname : 'unknown'
+            return `filament-fullcalendar:expanded-groups:${path}`
+        },
+
+        persistExpandedGroups(groups) {
+            try {
+                const storageKey = this.getExpandedGroupsStorageKey()
+                window.sessionStorage.setItem(storageKey, JSON.stringify(groups || []))
+                console.log('[filament-fullcalendar] 💾 persisted to sessionStorage:', groups)
+            } catch (e) {
+                console.warn('[filament-fullcalendar] failed to persist expanded groups', e)
+            }
+        },
+
+        getPersistedExpandedGroups() {
+            try {
+                const storageKey = this.getExpandedGroupsStorageKey()
+                const stored = window.sessionStorage.getItem(storageKey)
+                if (stored) {
+                    const parsed = JSON.parse(stored)
+                    console.log('[filament-fullcalendar] 📂 loaded from sessionStorage:', parsed)
+                    return Array.isArray(parsed) ? parsed : []
+                }
+            } catch (e) {
+                console.warn('[filament-fullcalendar] failed to load expanded groups', e)
+            }
+            return null
         },
 
         // Removed scroll persistence (not required)

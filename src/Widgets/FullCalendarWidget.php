@@ -89,21 +89,9 @@ class FullCalendarWidget extends Widget implements HasForms, HasActions
      */
     public function getPersistedExpandedResources(): array
     {
-        $groups = session($this->getExpandedGroupsSessionKey(), null);
-
-        // If nothing in session yet, use getInitiallyExpandedResources as default
-        if ($groups === null) {
-            return $this->getInitiallyExpandedResources();
-        }
-
-        if (! is_array($groups)) {
-            return [];
-        }
-
-        // Normalize as array of strings without duplicates
-        $normalized = array_map('strval', $groups);
-
-        return array_values(array_unique($normalized));
+        // Return initial expanded resources as default for first visit
+        // (sessionStorage in browser will override this after first interaction)
+        return $this->getInitiallyExpandedResources();
     }
 
     /**
@@ -115,9 +103,7 @@ class FullCalendarWidget extends Widget implements HasForms, HasActions
      */
     public function saveExpandedGroups(array $groups): void
     {
-        // Normalize as array of unique strings
-        $normalized = array_values(array_unique(array_map('strval', $groups)));
-
-        session([$this->getExpandedGroupsSessionKey() => $normalized]);
+        // This method is kept for backwards compatibility but is no longer used
+        // Expanded groups are now persisted in browser sessionStorage (like view/date)
     }
 }
