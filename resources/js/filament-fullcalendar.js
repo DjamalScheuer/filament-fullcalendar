@@ -30,6 +30,7 @@ export default function fullcalendar({
     eventWillUnmount,
     resourceGroupLabelDidMount,
     initiallyExpandedResources,
+    persistedExpandedResources,
     searchConfig,
 }) {
     return {
@@ -130,11 +131,18 @@ export default function fullcalendar({
                         }
                     } catch (e) { /* no-op */ }
                     
-                    // Then handle automatic expansion based on initiallyExpandedResources
-                    if (initiallyExpandedResources && initiallyExpandedResources.length > 0) {
+                    // Then handle automatic expansion based on merged expanded resources
+                    const mergedExpandedResources = (() => {
+                        const a = Array.isArray(initiallyExpandedResources) ? initiallyExpandedResources : []
+                        const b = Array.isArray(persistedExpandedResources) ? persistedExpandedResources : []
+                        // normalize to strings and dedupe
+                        return Array.from(new Set([...a, ...b].map(v => String(v))))
+                    })()
+
+                    if (mergedExpandedResources && mergedExpandedResources.length > 0) {
                         // Check if this resource should be initially expanded
-                        if (initiallyExpandedResources.includes(info.groupValue) || 
-                            initiallyExpandedResources.includes(String(info.groupValue))) {
+                        if (mergedExpandedResources.includes(info.groupValue) ||
+                            mergedExpandedResources.includes(String(info.groupValue))) {
                             // Find and click the expander element
                             const expander = info.el.querySelector('.fc-datagrid-expander');
                             if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
@@ -190,6 +198,63 @@ export default function fullcalendar({
             })
 
             calendar.render()
+
+            // Apply merged expanded groups shortly after initial render to ensure DOM is ready
+            try {
+                const mergedExpandedResources = (() => {
+                    const a = Array.isArray(initiallyExpandedResources) ? initiallyExpandedResources : []
+                    const b = Array.isArray(persistedExpandedResources) ? persistedExpandedResources : []
+                    return Array.from(new Set([...a, ...b].map(v => String(v))))
+                })()
+                if (mergedExpandedResources.length > 0) {
+                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 50)
+                }
+            } catch (e) { /* no-op */ }
+
+            // Wire up a delegated click listener on the datagrid to capture expand/collapse changes
+            try {
+                const datagrid = this.$el.querySelector('.fc-datagrid')
+                if (datagrid) {
+                    const saveExpanded = (openGroups) => {
+                        if (this.$wire && typeof this.$wire.saveExpandedGroups === 'function') {
+                            this.$wire.saveExpandedGroups(openGroups)
+                        }
+                    }
+                    const collectOpenGroups = () => {
+                        const scope = this.$el || document
+                        const labels = scope.querySelectorAll('.fc-datagrid [data-group-value]')
+                        const open = []
+                        labels.forEach((label) => {
+                            const row = label.closest('.fc-datagrid-row') || label.parentElement
+                            const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
+                            const isOpen = !!(expander && expander.classList.contains('fc-icon-chevron-down'))
+                            if (isOpen) {
+                                const value = label.getAttribute('data-group-value')
+                                if (value != null) open.push(String(value))
+                            }
+                        })
+                        // dedupe
+                        return Array.from(new Set(open))
+                    }
+                    const debouncedSave = ((fn, wait = 300) => {
+                        let timer = null
+                        return (...args) => {
+                            if (timer) clearTimeout(timer)
+                            timer = setTimeout(() => fn.apply(this, args), wait)
+                        }
+                    })(saveExpanded, 250)
+
+                    datagrid.addEventListener('click', (e) => {
+                        const expander = e.target && e.target.closest ? e.target.closest('.fc-datagrid-expander') : null
+                        if (!expander) return
+                        // Wait for FullCalendar's toggle to reflect in DOM, then collect and save
+                        setTimeout(() => {
+                            const openGroups = collectOpenGroups()
+                            debouncedSave(openGroups)
+                        }, 0)
+                    })
+                }
+            } catch (e) { /* no-op */ }
 
 			// Inject default highlight style once (safe fallback)
 			if (!document.getElementById('fc-event-highlight-style')) {
