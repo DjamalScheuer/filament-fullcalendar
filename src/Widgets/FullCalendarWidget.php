@@ -89,7 +89,12 @@ class FullCalendarWidget extends Widget implements HasForms, HasActions
      */
     public function getPersistedExpandedResources(): array
     {
-        $groups = session($this->getExpandedGroupsSessionKey(), []);
+        $groups = session($this->getExpandedGroupsSessionKey(), null);
+
+        // If nothing in session yet, use getInitiallyExpandedResources as default
+        if ($groups === null) {
+            return $this->getInitiallyExpandedResources();
+        }
 
         if (! is_array($groups)) {
             return [];

@@ -29,7 +29,6 @@ export default function fullcalendar({
     eventDidMount,
     eventWillUnmount,
     resourceGroupLabelDidMount,
-    initiallyExpandedResources,
     persistedExpandedResources,
     searchConfig,
 }) {
@@ -179,19 +178,18 @@ export default function fullcalendar({
 
             calendar.render()
 
-            // Apply merged expanded groups shortly after initial render to ensure DOM is ready
+            // Apply persisted expanded groups shortly after initial render to ensure DOM is ready
+            // (persistedExpandedResources already includes initiallyExpandedResources as fallback)
             try {
-                const mergedExpandedResources = (() => {
-                    const a = Array.isArray(initiallyExpandedResources) ? initiallyExpandedResources : []
-                    const b = Array.isArray(persistedExpandedResources) ? persistedExpandedResources : []
-                    return Array.from(new Set([...a, ...b].map(v => String(v))))
-                })()
-                if (mergedExpandedResources.length > 0) {
+                const expandedResources = Array.isArray(persistedExpandedResources) 
+                    ? persistedExpandedResources.map(v => String(v))
+                    : []
+                if (expandedResources.length > 0) {
                     // Single pass; robust detection inside expandGroupsByValues prevents toggling
-                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 120)
+                    setTimeout(() => this.expandGroupsByValues(expandedResources), 120)
                 }
                 // Track last saved to avoid redundant calls
-                this._lastSavedOpenGroups = mergedExpandedResources.slice()
+                this._lastSavedOpenGroups = expandedResources.slice()
 
                 // Debug helper to inspect available group labels at runtime
                 try {
@@ -277,16 +275,19 @@ export default function fullcalendar({
                         const isCollapsedPre = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right'))) || expander.getAttribute('aria-expanded') === 'false'
                         const isExpandedPre = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down'))) || expander.getAttribute('aria-expanded') === 'true'
 
+                        // Build next set from last saved set
+                        const last = Array.isArray(this._lastSavedOpenGroups) ? this._lastSavedOpenGroups.slice() : []
+                        const set = new Set(last.map(String))
+                        const wasInLastSaved = set.has(String(groupValue))
+
                         console.log('[filament-fullcalendar] 📊 expander state PRE-click', { 
                             groupValue, 
                             isCollapsedPre, 
                             isExpandedPre, 
-                            iconClasses: icon?.className 
+                            iconClasses: icon?.className,
+                            wasInLastSaved,
+                            lastSaved: last
                         })
-
-                        // Build next set from last saved set
-                        const last = Array.isArray(this._lastSavedOpenGroups) ? this._lastSavedOpenGroups.slice() : []
-                        const set = new Set(last.map(String))
 
                         if (isCollapsedPre && !isExpandedPre) {
                             // Will open

@@ -49,7 +49,6 @@
                 eventDidMount: {!! htmlspecialchars($this->eventDidMount(), ENT_COMPAT) !!},
                 eventWillUnmount: {!! htmlspecialchars($this->eventWillUnmount(), ENT_COMPAT) !!},
                 resourceGroupLabelDidMount: {!! htmlspecialchars($this->resourceGroupLabelDidMount(), ENT_COMPAT) !!},
-                initiallyExpandedResources: @js($this->getInitiallyExpandedResources()),
                 persistedExpandedResources: @js($this->getPersistedExpandedResources()),
                 searchConfig: @js($this->getSearchConfig()),
             })">
