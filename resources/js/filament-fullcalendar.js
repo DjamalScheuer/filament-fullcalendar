@@ -145,9 +145,13 @@ export default function fullcalendar({
                             mergedExpandedResources.includes(String(info.groupValue))) {
                             // Find and click the expander element
                             const expander = info.el.querySelector('.fc-datagrid-expander');
-                            if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
-                                // Only click if it's not already expanded (chevron-down indicates expanded)
-                                expander.click();
+                            if (expander) {
+                                const icon = expander.querySelector('.fc-icon')
+                                const isCollapsed = (icon && icon.classList.contains('fc-icon-chevron-right')) || expander.getAttribute('aria-expanded') === 'false'
+                                const isExpanded = (icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
+                                if (isCollapsed && !isExpanded) {
+                                    expander.click();
+                                }
                             }
                         }
                     }
@@ -246,10 +250,13 @@ export default function fullcalendar({
                         labels.forEach((label) => {
                             const row = label.closest('.fc-datagrid-row') || label.parentElement
                             const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
-                            const isOpen = !!(expander && expander.classList.contains('fc-icon-chevron-down'))
-                            if (isOpen) {
-                                const value = label.getAttribute('data-group-value')
-                                if (value != null) open.push(String(value))
+                            if (expander) {
+                                const icon = expander.querySelector('.fc-icon')
+                                const isOpen = (icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
+                                if (isOpen) {
+                                    const value = label.getAttribute('data-group-value')
+                                    if (value != null) open.push(String(value))
+                                }
                             }
                         })
                         // dedupe
@@ -661,9 +668,14 @@ export default function fullcalendar({
 					}
 					const row = label.closest('.fc-datagrid-row') || label.parentElement
 					const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
-					if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
-						console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
-						expander.click()
+					if (expander) {
+						const icon = expander.querySelector('.fc-icon')
+						const isCollapsed = (icon && icon.classList.contains('fc-icon-chevron-right')) || expander.getAttribute('aria-expanded') === 'false'
+						const isExpanded = (icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
+						if (isCollapsed && !isExpanded) {
+							console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
+							expander.click()
+						}
 					}
 				})
 			} catch (e) {
