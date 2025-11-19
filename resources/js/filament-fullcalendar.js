@@ -222,10 +222,11 @@ export default function fullcalendar({
                         const labels = scope.querySelectorAll('.fc-datagrid [data-group-value]')
                         const open = []
                         labels.forEach((label) => {
-                            const row = label.closest('.fc-datagrid-row') || label.parentElement
+                            const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
                             const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
                             const icon = expander ? expander.querySelector('.fc-icon') : null
-                            const isOpenByIcon = !!(icon && icon.classList.contains('fc-icon-chevron-down'))
+                            // FullCalendar uses minus-square for expanded, plus-square for collapsed
+                            const isOpenByIcon = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
                             // row may have aria-expanded as well
                             const isOpenByRow = row && row.getAttribute && row.getAttribute('aria-expanded') === 'true'
                             const isOpen = isOpenByIcon || isOpenByRow
@@ -266,8 +267,9 @@ export default function fullcalendar({
 
                         // Determine current (pre-click) state using icon/aria (pre-toggle)
                         const icon = expander.querySelector('.fc-icon')
-                        const isCollapsedPre = !!(icon && icon.classList.contains('fc-icon-chevron-right')) || expander.getAttribute('aria-expanded') === 'false'
-                        const isExpandedPre = !!(icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
+                        // FullCalendar uses plus-square for collapsed, minus-square for expanded
+                        const isCollapsedPre = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right'))) || expander.getAttribute('aria-expanded') === 'false'
+                        const isExpandedPre = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down'))) || expander.getAttribute('aria-expanded') === 'true'
 
                         // Build next set from last saved set
                         const last = Array.isArray(this._lastSavedOpenGroups) ? this._lastSavedOpenGroups.slice() : []
@@ -692,12 +694,13 @@ export default function fullcalendar({
 						}
 						return
 					}
-					const row = label.closest('.fc-datagrid-row') || label.parentElement
+					const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
 					const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
 					if (expander) {
 						const icon = expander.querySelector('.fc-icon')
-						const isCollapsed = !!(icon && icon.classList.contains('fc-icon-chevron-right'))
-						const isExpanded = !!(icon && icon.classList.contains('fc-icon-chevron-down'))
+						// FullCalendar uses plus-square for collapsed, minus-square for expanded
+						const isCollapsed = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right')))
+						const isExpanded = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
 						if (isCollapsed && !isExpanded) {
 							console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
 							expander.click()
