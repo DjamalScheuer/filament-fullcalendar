@@ -309,24 +309,11 @@ export default function fullcalendar({
                         }
                     }, true)
 
-                    // Fallback: observe icon/aria changes to persist state
+                    // Manual debug hook
                     try {
-                        const observer = new MutationObserver(() => {
-                            const openGroups = collectOpenGroups()
-                            if (!arraysEqual(openGroups, this._lastSavedOpenGroups || [])) {
-                                this._lastSavedOpenGroups = openGroups
-                                debouncedSave(openGroups)
-                            }
-                        })
-                        observer.observe(container, {
-                            subtree: true,
-                            attributes: true,
-                            attributeFilter: ['class', 'aria-expanded'],
-                        })
-                        // Manual debug hook
                         window.__fcSaveExpandedGroups = () => {
                             const openGroups = collectOpenGroups()
-                            try { console.debug?.('[filament-fullcalendar] manual save, openGroups', openGroups) } catch (_) {}
+                            console.log('[filament-fullcalendar] 🔧 manual save, openGroups', openGroups)
                             this._lastSavedOpenGroups = openGroups
                             saveExpanded(openGroups)
                         }
