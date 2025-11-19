@@ -207,10 +207,26 @@ export default function fullcalendar({
                     return Array.from(new Set([...a, ...b].map(v => String(v))))
                 })()
                 if (mergedExpandedResources.length > 0) {
-                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 50)
+                    // Multiple retries in case labels mount lazily/virtualized
+                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 60)
+                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 180)
+                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 400)
                 }
                 // Track last saved to avoid redundant calls
                 this._lastSavedOpenGroups = mergedExpandedResources.slice()
+
+                // Debug helper to inspect available group labels at runtime
+                try {
+                    window.__fcListGroupLabels = () => {
+                        const scope = this.$el || document
+                        const labels = Array.from(scope.querySelectorAll('.fc-datagrid [data-group-value]')).map(el => ({
+                            value: el.getAttribute('data-group-value'),
+                            text: (el.textContent || '').trim(),
+                        }))
+                        console.table(labels)
+                        return labels
+                    }
+                } catch (_) {}
             } catch (e) { /* no-op */ }
 
             // Wire up a delegated click listener on the datagrid to capture expand/collapse changes
@@ -605,17 +621,49 @@ export default function fullcalendar({
 			try {
 				const scope = this.$el || document
 				if (!Array.isArray(groupValues) || groupValues.length === 0) return
-				groupValues.forEach((gv) => {
-					const label = scope.querySelector(`.fc-datagrid [data-group-value="${CSS.escape(String(gv))}"]`)
-					if (label) {
-						const row = label.closest('.fc-datagrid-row') || label.parentElement
-						const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
-						if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
-							console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
-							expander.click()
+
+				const findLabelForGroupValue = (gv) => {
+					const valueStr = String(gv)
+					// 1) Try strict data attribute within datagrid
+					let label = scope.querySelector(`.fc-datagrid [data-group-value="${CSS.escape(valueStr)}"]`)
+					if (label) return label
+					// 2) Try strict data attribute anywhere within scope
+					label = scope.querySelector(`[data-group-value="${CSS.escape(valueStr)}"]`)
+					if (label) return label
+					// 3) Fallback: scan all labeled elements and match by visible text
+					const candidates = scope.querySelectorAll('.fc-datagrid [data-group-value]')
+					for (const el of candidates) {
+						const text = (el.textContent || '').trim()
+						if (text === valueStr || text.toLowerCase() === valueStr.toLowerCase()) {
+							return el
 						}
-					} else {
-						console.log('[filament-fullcalendar] expandGroupsByValues: group label not found', gv)
+						// lenient contains match as last resort
+						if (text.toLowerCase().includes(valueStr.toLowerCase())) {
+							return el
+						}
+					}
+					return null
+				}
+
+				groupValues.forEach((gv) => {
+					const label = findLabelForGroupValue(gv)
+					if (!label) {
+						try {
+							const available = Array.from(scope.querySelectorAll('.fc-datagrid [data-group-value]')).map(el => ({
+								value: el.getAttribute('data-group-value'),
+								text: (el.textContent || '').trim(),
+							}))
+							console.log('[filament-fullcalendar] expandGroupsByValues: group label not found', gv, { available })
+						} catch (_) {
+							console.log('[filament-fullcalendar] expandGroupsByValues: group label not found', gv)
+						}
+						return
+					}
+					const row = label.closest('.fc-datagrid-row') || label.parentElement
+					const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
+					if (expander && !expander.classList.contains('fc-icon-chevron-down')) {
+						console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
+						expander.click()
 					}
 				})
 			} catch (e) {
