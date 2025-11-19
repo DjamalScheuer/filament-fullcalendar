@@ -209,6 +209,8 @@ export default function fullcalendar({
                 if (mergedExpandedResources.length > 0) {
                     setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 50)
                 }
+                // Track last saved to avoid redundant calls
+                this._lastSavedOpenGroups = mergedExpandedResources.slice()
             } catch (e) { /* no-op */ }
 
             // Wire up a delegated click listener on the datagrid to capture expand/collapse changes
@@ -217,6 +219,7 @@ export default function fullcalendar({
                 if (datagrid) {
                     const saveExpanded = (openGroups) => {
                         if (this.$wire && typeof this.$wire.saveExpandedGroups === 'function') {
+                            try { console.debug?.('[filament-fullcalendar] saveExpandedGroups', openGroups) } catch (_) {}
                             this.$wire.saveExpandedGroups(openGroups)
                         }
                     }
@@ -236,6 +239,14 @@ export default function fullcalendar({
                         // dedupe
                         return Array.from(new Set(open))
                     }
+                    const arraysEqual = (a, b) => {
+                        if (!Array.isArray(a) || !Array.isArray(b)) return false
+                        if (a.length !== b.length) return false
+                        for (let i = 0; i < a.length; i++) {
+                            if (a[i] !== b[i]) return false
+                        }
+                        return true
+                    }
                     const debouncedSave = ((fn, wait = 300) => {
                         let timer = null
                         return (...args) => {
@@ -244,15 +255,18 @@ export default function fullcalendar({
                         }
                     })(saveExpanded, 250)
 
-                    datagrid.addEventListener('click', (e) => {
-                        const expander = e.target && e.target.closest ? e.target.closest('.fc-datagrid-expander') : null
-                        if (!expander) return
-                        // Wait for FullCalendar's toggle to reflect in DOM, then collect and save
+                    // Save on any click within the datagrid; only persist if state actually changed
+                    datagrid.addEventListener('click', () => {
+                        // Wait for FullCalendar's toggle to reflect in DOM, then collect and maybe save
                         setTimeout(() => {
                             const openGroups = collectOpenGroups()
-                            debouncedSave(openGroups)
+                            try { console.debug?.('[filament-fullcalendar] datagrid click, openGroups', openGroups) } catch (_) {}
+                            if (!arraysEqual(openGroups, this._lastSavedOpenGroups || [])) {
+                                this._lastSavedOpenGroups = openGroups
+                                debouncedSave(openGroups)
+                            }
                         }, 0)
-                    })
+                    }, true)
                 }
             } catch (e) { /* no-op */ }
 
