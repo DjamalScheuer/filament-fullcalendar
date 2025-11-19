@@ -260,16 +260,29 @@ export default function fullcalendar({
                         if (!expander) return
 
                         // Identify group value from the same row
-                        const row = expander.closest('.fc-datagrid-row') || expander.parentElement
+                        const row = expander.closest('tr') || expander.closest('.fc-datagrid-row') || expander.parentElement
                         const labelEl = row ? row.querySelector('[data-group-value]') : null
                         const groupValue = labelEl ? labelEl.getAttribute('data-group-value') : null
-                        if (!groupValue) return
+                        
+                        console.log('[filament-fullcalendar] ✅ expander clicked', { groupValue, hasLabel: !!labelEl })
+                        
+                        if (!groupValue) {
+                            console.warn('[filament-fullcalendar] ⚠️ expander clicked but no groupValue found')
+                            return
+                        }
 
                         // Determine current (pre-click) state using icon/aria (pre-toggle)
                         const icon = expander.querySelector('.fc-icon')
                         // FullCalendar uses plus-square for collapsed, minus-square for expanded
                         const isCollapsedPre = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right'))) || expander.getAttribute('aria-expanded') === 'false'
                         const isExpandedPre = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down'))) || expander.getAttribute('aria-expanded') === 'true'
+
+                        console.log('[filament-fullcalendar] 📊 expander state PRE-click', { 
+                            groupValue, 
+                            isCollapsedPre, 
+                            isExpandedPre, 
+                            iconClasses: icon?.className 
+                        })
 
                         // Build next set from last saved set
                         const last = Array.isArray(this._lastSavedOpenGroups) ? this._lastSavedOpenGroups.slice() : []
@@ -278,17 +291,21 @@ export default function fullcalendar({
                         if (isCollapsedPre && !isExpandedPre) {
                             // Will open
                             set.add(String(groupValue))
+                            console.log('[filament-fullcalendar] 🔓 will EXPAND:', groupValue)
                         } else {
                             // Will close (or unknown) – remove to be safe
                             set.delete(String(groupValue))
+                            console.log('[filament-fullcalendar] 🔒 will COLLAPSE:', groupValue)
                         }
 
                         const next = Array.from(set)
-                        try { console.debug?.('[filament-fullcalendar] expander click -> next openGroups', next) } catch (_) {}
+                        console.log('[filament-fullcalendar] 💾 saving new state:', next)
 
                         if (!arraysEqual(next, this._lastSavedOpenGroups || [])) {
                             this._lastSavedOpenGroups = next
                             debouncedSave(next)
+                        } else {
+                            console.log('[filament-fullcalendar] ⏭️ skipping save (no change)')
                         }
                     }, true)
 
