@@ -659,58 +659,87 @@ export default function fullcalendar({
 			}
 		},
 		
-		expandGroupsByValues(groupValues) {
-			try {
-				const scope = this.$el || document
-				if (!Array.isArray(groupValues) || groupValues.length === 0) return
-
-				const findLabelForGroupValue = (gv) => {
-					const valueStr = String(gv)
-					// 1) Try strict data attribute within datagrid
-					let label = scope.querySelector(`.fc-datagrid [data-group-value="${CSS.escape(valueStr)}"]`)
-					if (label) return label
-					// 2) Try strict data attribute anywhere within scope
-					label = scope.querySelector(`[data-group-value="${CSS.escape(valueStr)}"]`)
-					if (label) return label
-					// 3) Fallback: scan all labeled elements and match by visible text
-					const candidates = scope.querySelectorAll('.fc-datagrid [data-group-value]')
-					for (const el of candidates) {
-						const text = (el.textContent || '').trim()
-						if (text === valueStr || text.toLowerCase() === valueStr.toLowerCase()) {
-							return el
-						}
-						// lenient contains match as last resort
-						if (text.toLowerCase().includes(valueStr.toLowerCase())) {
-							return el
-						}
-					}
-					return null
-				}
-
-				// Init session set for idempotence
-				if (!this._expandedByPlugin) this._expandedByPlugin = new Set()
-
-				groupValues.forEach((gv) => {
-					if (this._expandedByPlugin.has(String(gv))) return
-					const label = findLabelForGroupValue(gv)
-					if (!label) return
-					const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
-					const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
-					if (expander) {
-						const icon = expander.querySelector('.fc-icon')
-						// FullCalendar uses plus-square for collapsed, minus-square for expanded
-						const isCollapsed = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right')))
-						const isExpanded = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
-						if (isCollapsed && !isExpanded) {
-							expander.click()
-							this._expandedByPlugin.add(String(gv))
-						}
-					}
-				})
-			} catch (e) {
-				console.warn('[filament-fullcalendar] expandGroupsByValues: error', e)
+	expandGroupsByValues(groupValues) {
+		try {
+			console.log('[filament-fullcalendar] expandGroupsByValues called with:', groupValues)
+			const scope = this.$el || document
+			if (!Array.isArray(groupValues) || groupValues.length === 0) {
+				console.log('[filament-fullcalendar] expandGroupsByValues: no valid groups to expand')
+				return
 			}
-		},
+
+			const findLabelForGroupValue = (gv) => {
+				const valueStr = String(gv)
+				console.log('[filament-fullcalendar] searching for group value:', valueStr)
+				// 1) Try strict data attribute within datagrid
+				let label = scope.querySelector(`.fc-datagrid [data-group-value="${CSS.escape(valueStr)}"]`)
+				if (label) {
+					console.log('[filament-fullcalendar] found label via strict datagrid match')
+					return label
+				}
+				// 2) Try strict data attribute anywhere within scope
+				label = scope.querySelector(`[data-group-value="${CSS.escape(valueStr)}"]`)
+				if (label) {
+					console.log('[filament-fullcalendar] found label via strict attribute match')
+					return label
+				}
+				// 3) Fallback: scan all labeled elements and match by visible text
+				const candidates = scope.querySelectorAll('.fc-datagrid [data-group-value]')
+				console.log('[filament-fullcalendar] scanning', candidates.length, 'candidate labels')
+				for (const el of candidates) {
+					const text = (el.textContent || '').trim()
+					const dataValue = el.getAttribute('data-group-value')
+					console.log('[filament-fullcalendar] checking candidate:', { text, dataValue, searchFor: valueStr })
+					if (text === valueStr || text.toLowerCase() === valueStr.toLowerCase()) {
+						console.log('[filament-fullcalendar] found label via text match')
+						return el
+					}
+					// lenient contains match as last resort
+					if (text.toLowerCase().includes(valueStr.toLowerCase())) {
+						console.log('[filament-fullcalendar] found label via contains match')
+						return el
+					}
+				}
+				console.log('[filament-fullcalendar] no label found for group value:', valueStr)
+				return null
+			}
+
+			// Init session set for idempotence
+			if (!this._expandedByPlugin) this._expandedByPlugin = new Set()
+
+			groupValues.forEach((gv) => {
+				if (this._expandedByPlugin.has(String(gv))) {
+					console.log('[filament-fullcalendar] group already expanded:', gv)
+					return
+				}
+				const label = findLabelForGroupValue(gv)
+				if (!label) {
+					console.log('[filament-fullcalendar] could not find label for group:', gv)
+					return
+				}
+				const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
+				const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
+				console.log('[filament-fullcalendar] found expander for group:', gv, !!expander)
+				if (expander) {
+					const icon = expander.querySelector('.fc-icon')
+					// FullCalendar uses plus-square for collapsed, minus-square for expanded
+					const isCollapsed = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right')))
+					const isExpanded = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
+					console.log('[filament-fullcalendar] group state:', { gv, isCollapsed, isExpanded })
+					if (isCollapsed && !isExpanded) {
+						console.log('[filament-fullcalendar] clicking expander for group:', gv)
+						expander.click()
+						this._expandedByPlugin.add(String(gv))
+					} else {
+						console.log('[filament-fullcalendar] group already expanded or in unknown state:', gv)
+					}
+				}
+			})
+			console.log('[filament-fullcalendar] expandGroupsByValues completed')
+		} catch (e) {
+			console.warn('[filament-fullcalendar] expandGroupsByValues: error', e)
+		}
+	},
 
 		// group-based expansion removed (reverted to simpler logic)
 
@@ -822,19 +851,30 @@ export default function fullcalendar({
 						calendar.rerenderEvents()
 					}
 					
-					// Ask backend which resource groups to expand for this event id (optional override)
-					if (this.$wire && typeof this.$wire.getResourceGroupsForEvent === 'function') {
-						try {
-							Promise.resolve(this.$wire.getResourceGroupsForEvent(String(event.id)))
-								.then((groups) => {
-									if (Array.isArray(groups) && groups.length > 0) {
-										// Expand requested groups before trying to find the event DOM node
-										setTimeout(() => this.expandGroupsByValues(groups), 150)
-									}
-								})
-								.catch(() => { /* ignore */ })
-						} catch (e) { /* ignore */ }
+				// Ask backend which resource groups to expand for this event id (optional override)
+				if (this.$wire && typeof this.$wire.getResourceGroupsForEvent === 'function') {
+					console.log('[filament-fullcalendar] calling getResourceGroupsForEvent for event:', event.id)
+					try {
+						Promise.resolve(this.$wire.getResourceGroupsForEvent(String(event.id)))
+							.then((groups) => {
+								console.log('[filament-fullcalendar] getResourceGroupsForEvent returned:', groups)
+								if (Array.isArray(groups) && groups.length > 0) {
+									// Expand requested groups before trying to find the event DOM node
+									console.log('[filament-fullcalendar] expanding groups:', groups)
+									setTimeout(() => this.expandGroupsByValues(groups), 150)
+								} else {
+									console.log('[filament-fullcalendar] no groups to expand (empty or invalid response)')
+								}
+							})
+							.catch((err) => { 
+								console.warn('[filament-fullcalendar] getResourceGroupsForEvent error:', err)
+							})
+					} catch (e) { 
+						console.warn('[filament-fullcalendar] getResourceGroupsForEvent exception:', e)
 					}
+				} else {
+					console.log('[filament-fullcalendar] getResourceGroupsForEvent not available on $wire')
+				}
 					
 					// Expand resource groups (if any) so the event row becomes visible
 					setTimeout(() => this.tryExpandForEventWithRetries(calendar, event, 0), 200)
