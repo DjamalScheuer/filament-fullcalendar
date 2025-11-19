@@ -187,7 +187,6 @@ export default function fullcalendar({
                     expandedResources = Array.isArray(persistedExpandedResources) 
                         ? persistedExpandedResources.map(v => String(v))
                         : []
-                    console.log('[filament-fullcalendar] 🆕 first visit, using server default:', expandedResources)
                 }
                 
                 if (expandedResources.length > 0) {
@@ -266,12 +265,7 @@ export default function fullcalendar({
                         const labelEl = row ? row.querySelector('[data-group-value]') : null
                         const groupValue = labelEl ? labelEl.getAttribute('data-group-value') : null
                         
-                        console.log('[filament-fullcalendar] ✅ expander clicked', { groupValue, hasLabel: !!labelEl })
-                        
-                        if (!groupValue) {
-                            console.warn('[filament-fullcalendar] ⚠️ expander clicked but no groupValue found')
-                            return
-                        }
+                        if (!groupValue) return
 
                         // Determine current (pre-click) state using icon/aria (pre-toggle)
                         const icon = expander.querySelector('.fc-icon')
@@ -282,50 +276,32 @@ export default function fullcalendar({
                         // Build next set from last saved set
                         const last = Array.isArray(this._lastSavedOpenGroups) ? this._lastSavedOpenGroups.slice() : []
                         const set = new Set(last.map(String))
-                        const wasInLastSaved = set.has(String(groupValue))
-
-                        console.log('[filament-fullcalendar] 📊 expander state PRE-click', { 
-                            groupValue, 
-                            isCollapsedPre, 
-                            isExpandedPre, 
-                            iconClasses: icon?.className,
-                            wasInLastSaved,
-                            lastSaved: last
-                        })
 
                         if (isCollapsedPre && !isExpandedPre) {
                             // Will open
                             set.add(String(groupValue))
-                            console.log('[filament-fullcalendar] 🔓 will EXPAND:', groupValue)
                         } else {
                             // Will close (or unknown) – remove to be safe
                             set.delete(String(groupValue))
-                            console.log('[filament-fullcalendar] 🔒 will COLLAPSE:', groupValue)
                         }
 
                         const next = Array.from(set)
-                        console.log('[filament-fullcalendar] 💾 saving new state:', next)
 
                         if (!arraysEqual(next, this._lastSavedOpenGroups || [])) {
                             this._lastSavedOpenGroups = next
                             debouncedSave(next)
-                        } else {
-                            console.log('[filament-fullcalendar] ⏭️ skipping save (no change)')
                         }
                     }, true)
 
-                    // Manual debug hooks
+                    // Debug hooks for manual testing
                     try {
                         window.__fcSaveExpandedGroups = () => {
                             const openGroups = collectOpenGroups()
-                            console.log('[filament-fullcalendar] 🔧 manual save, openGroups', openGroups)
                             this._lastSavedOpenGroups = openGroups
                             saveExpanded(openGroups)
                         }
                         window.__fcClearExpandedGroups = () => {
-                            const key = this.getExpandedGroupsStorageKey()
-                            window.sessionStorage.removeItem(key)
-                            console.log('[filament-fullcalendar] 🗑️ cleared sessionStorage')
+                            window.sessionStorage.removeItem(this.getExpandedGroupsStorageKey())
                         }
                     } catch (_) {}
                 }
@@ -423,9 +399,8 @@ export default function fullcalendar({
             try {
                 const storageKey = this.getExpandedGroupsStorageKey()
                 window.sessionStorage.setItem(storageKey, JSON.stringify(groups || []))
-                console.log('[filament-fullcalendar] 💾 persisted to sessionStorage:', groups)
             } catch (e) {
-                console.warn('[filament-fullcalendar] failed to persist expanded groups', e)
+                // Ignore storage errors
             }
         },
 
@@ -435,11 +410,10 @@ export default function fullcalendar({
                 const stored = window.sessionStorage.getItem(storageKey)
                 if (stored) {
                     const parsed = JSON.parse(stored)
-                    console.log('[filament-fullcalendar] 📂 loaded from sessionStorage:', parsed)
                     return Array.isArray(parsed) ? parsed : []
                 }
             } catch (e) {
-                console.warn('[filament-fullcalendar] failed to load expanded groups', e)
+                // Ignore storage errors
             }
             return null
         },
@@ -726,18 +700,7 @@ export default function fullcalendar({
 				groupValues.forEach((gv) => {
 					if (this._expandedByPlugin.has(String(gv))) return
 					const label = findLabelForGroupValue(gv)
-					if (!label) {
-						try {
-							const available = Array.from(scope.querySelectorAll('.fc-datagrid [data-group-value]')).map(el => ({
-								value: el.getAttribute('data-group-value'),
-								text: (el.textContent || '').trim(),
-							}))
-							console.log('[filament-fullcalendar] expandGroupsByValues: group label not found', gv, { available })
-						} catch (_) {
-							console.log('[filament-fullcalendar] expandGroupsByValues: group label not found', gv)
-						}
-						return
-					}
+					if (!label) return
 					const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
 					const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
 					if (expander) {
@@ -746,7 +709,6 @@ export default function fullcalendar({
 						const isCollapsed = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right')))
 						const isExpanded = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
 						if (isCollapsed && !isExpanded) {
-							console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
 							expander.click()
 							this._expandedByPlugin.add(String(gv))
 						}

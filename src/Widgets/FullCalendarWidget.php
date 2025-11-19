@@ -74,16 +74,8 @@ class FullCalendarWidget extends Widget implements HasForms, HasActions
     }
 
     /**
-     * Generate a unique session storage key for expanded resource groups
-     * scoped to this widget instance.
-     */
-    public function getExpandedGroupsSessionKey(): string
-    {
-        return 'filament_fullcalendar.expanded_groups.' . static::class . '.' . $this->getId();
-    }
-
-    /**
-     * Return persisted expanded resource groups from the session.
+     * Return initial expanded resource groups for first visit.
+     * Browser sessionStorage will persist user's expand/collapse choices after that.
      *
      * @return array<int, string>
      */
@@ -92,18 +84,5 @@ class FullCalendarWidget extends Widget implements HasForms, HasActions
         // Return initial expanded resources as default for first visit
         // (sessionStorage in browser will override this after first interaction)
         return $this->getInitiallyExpandedResources();
-    }
-
-    /**
-     * Persist the expanded resource groups in the session.
-     *
-     * Invoked from the frontend via $wire.saveExpandedGroups([...]).
-     *
-     * @param array<int, string|int> $groups
-     */
-    public function saveExpandedGroups(array $groups): void
-    {
-        // This method is kept for backwards compatibility but is no longer used
-        // Expanded groups are now persisted in browser sessionStorage (like view/date)
     }
 }
