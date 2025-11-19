@@ -704,38 +704,47 @@ export default function fullcalendar({
 				return null
 			}
 
-			// Init session set for idempotence
-			if (!this._expandedByPlugin) this._expandedByPlugin = new Set()
+		// Temporarily pause sessionStorage updates to prevent race conditions
+		const originalSaveExpandedGroups = this.saveExpandedGroupsToStorage
+		this.saveExpandedGroupsToStorage = () => {
+			console.log('[filament-fullcalendar] saveExpandedGroupsToStorage temporarily disabled during expansion')
+		}
 
-			groupValues.forEach((gv) => {
-				if (this._expandedByPlugin.has(String(gv))) {
-					console.log('[filament-fullcalendar] group already expanded:', gv)
-					return
+		groupValues.forEach((gv) => {
+			const label = findLabelForGroupValue(gv)
+			if (!label) {
+				console.log('[filament-fullcalendar] could not find label for group:', gv)
+				return
+			}
+			const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
+			const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
+			console.log('[filament-fullcalendar] found expander for group:', gv, !!expander)
+			if (expander) {
+				const icon = expander.querySelector('.fc-icon')
+				// FullCalendar uses plus-square for collapsed, minus-square for expanded
+				const isCollapsed = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right')))
+				const isExpanded = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
+				console.log('[filament-fullcalendar] group state:', { gv, isCollapsed, isExpanded })
+				if (isCollapsed && !isExpanded) {
+					console.log('[filament-fullcalendar] clicking expander for group:', gv)
+					expander.click()
+				} else {
+					console.log('[filament-fullcalendar] group already expanded, skipping:', gv)
 				}
-				const label = findLabelForGroupValue(gv)
-				if (!label) {
-					console.log('[filament-fullcalendar] could not find label for group:', gv)
-					return
-				}
-				const row = label.closest('tr') || label.closest('.fc-datagrid-row') || label.parentElement
-				const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
-				console.log('[filament-fullcalendar] found expander for group:', gv, !!expander)
-				if (expander) {
-					const icon = expander.querySelector('.fc-icon')
-					// FullCalendar uses plus-square for collapsed, minus-square for expanded
-					const isCollapsed = !!(icon && (icon.classList.contains('fc-icon-plus-square') || icon.classList.contains('fc-icon-chevron-right')))
-					const isExpanded = !!(icon && (icon.classList.contains('fc-icon-minus-square') || icon.classList.contains('fc-icon-chevron-down')))
-					console.log('[filament-fullcalendar] group state:', { gv, isCollapsed, isExpanded })
-					if (isCollapsed && !isExpanded) {
-						console.log('[filament-fullcalendar] clicking expander for group:', gv)
-						expander.click()
-						this._expandedByPlugin.add(String(gv))
-					} else {
-						console.log('[filament-fullcalendar] group already expanded or in unknown state:', gv)
-					}
-				}
-			})
-			console.log('[filament-fullcalendar] expandGroupsByValues completed')
+			}
+		})
+		
+		// Re-enable sessionStorage updates after a delay to allow DOM to settle
+		setTimeout(() => {
+			this.saveExpandedGroupsToStorage = originalSaveExpandedGroups
+			console.log('[filament-fullcalendar] saveExpandedGroupsToStorage re-enabled')
+			// Now save the correct state
+			if (typeof this.saveExpandedGroupsToStorage === 'function') {
+				this.saveExpandedGroupsToStorage()
+			}
+		}, 300)
+		
+		console.log('[filament-fullcalendar] expandGroupsByValues completed')
 		} catch (e) {
 			console.warn('[filament-fullcalendar] expandGroupsByValues: error', e)
 		}
