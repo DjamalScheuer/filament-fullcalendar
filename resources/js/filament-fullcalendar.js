@@ -130,31 +130,7 @@ export default function fullcalendar({
                             info.el.setAttribute('data-group-value', String(info.groupValue))
                         }
                     } catch (e) { /* no-op */ }
-                    
-                    // Then handle automatic expansion based on merged expanded resources
-                    const mergedExpandedResources = (() => {
-                        const a = Array.isArray(initiallyExpandedResources) ? initiallyExpandedResources : []
-                        const b = Array.isArray(persistedExpandedResources) ? persistedExpandedResources : []
-                        // normalize to strings and dedupe
-                        return Array.from(new Set([...a, ...b].map(v => String(v))))
-                    })()
-
-                    if (mergedExpandedResources && mergedExpandedResources.length > 0) {
-                        // Check if this resource should be initially expanded
-                        if (mergedExpandedResources.includes(info.groupValue) ||
-                            mergedExpandedResources.includes(String(info.groupValue))) {
-                            // Find and click the expander element
-                            const expander = info.el.querySelector('.fc-datagrid-expander');
-                            if (expander) {
-                                const icon = expander.querySelector('.fc-icon')
-                                const isCollapsed = (icon && icon.classList.contains('fc-icon-chevron-right')) || expander.getAttribute('aria-expanded') === 'false'
-                                const isExpanded = (icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
-                                if (isCollapsed && !isExpanded) {
-                                    expander.click();
-                                }
-                            }
-                        }
-                    }
+                    // Do not auto-click here to avoid race/toggle; expansion handled post-render
                 },
                 datesSet: (info) => {
                     // Persist view and date whenever the visible range changes
@@ -211,10 +187,8 @@ export default function fullcalendar({
                     return Array.from(new Set([...a, ...b].map(v => String(v))))
                 })()
                 if (mergedExpandedResources.length > 0) {
-                    // Multiple retries in case labels mount lazily/virtualized
-                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 60)
-                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 180)
-                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 400)
+                    // Single pass; robust detection inside expandGroupsByValues prevents toggling
+                    setTimeout(() => this.expandGroupsByValues(mergedExpandedResources), 120)
                 }
                 // Track last saved to avoid redundant calls
                 this._lastSavedOpenGroups = mergedExpandedResources.slice()
@@ -233,10 +207,10 @@ export default function fullcalendar({
                 } catch (_) {}
             } catch (e) { /* no-op */ }
 
-            // Wire up a delegated click listener on the datagrid to capture expand/collapse changes
+            // Wire up listeners to capture expand/collapse changes
             try {
-                const datagrid = this.$el.querySelector('.fc-datagrid')
-                if (datagrid) {
+                const container = this.$el
+                if (container) {
                     const saveExpanded = (openGroups) => {
                         if (this.$wire && typeof this.$wire.saveExpandedGroups === 'function') {
                             try { console.debug?.('[filament-fullcalendar] saveExpandedGroups', openGroups) } catch (_) {}
@@ -244,19 +218,20 @@ export default function fullcalendar({
                         }
                     }
                     const collectOpenGroups = () => {
-                        const scope = this.$el || document
+                        const scope = container || document
                         const labels = scope.querySelectorAll('.fc-datagrid [data-group-value]')
                         const open = []
                         labels.forEach((label) => {
                             const row = label.closest('.fc-datagrid-row') || label.parentElement
                             const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
-                            if (expander) {
-                                const icon = expander.querySelector('.fc-icon')
-                                const isOpen = (icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
-                                if (isOpen) {
-                                    const value = label.getAttribute('data-group-value')
-                                    if (value != null) open.push(String(value))
-                                }
+                            const icon = expander ? expander.querySelector('.fc-icon') : null
+                            const isOpenByIcon = !!(icon && icon.classList.contains('fc-icon-chevron-down'))
+                            // row may have aria-expanded as well
+                            const isOpenByRow = row && row.getAttribute && row.getAttribute('aria-expanded') === 'true'
+                            const isOpen = isOpenByIcon || isOpenByRow
+                            if (isOpen) {
+                                const value = label.getAttribute('data-group-value')
+                                if (value != null) open.push(String(value))
                             }
                         })
                         // dedupe
@@ -278,8 +253,10 @@ export default function fullcalendar({
                         }
                     })(saveExpanded, 250)
 
-                    // Save on any click within the datagrid; only persist if state actually changed
-                    datagrid.addEventListener('click', () => {
+                    // Save only when an expander is clicked; persist if state actually changed
+                    container.addEventListener('click', (evt) => {
+                        const expanderClicked = evt.target && evt.target.closest ? evt.target.closest('.fc-datagrid-expander') : null
+                        if (!expanderClicked) return
                         // Wait for FullCalendar's toggle to reflect in DOM, then collect and maybe save
                         setTimeout(() => {
                             const openGroups = collectOpenGroups()
@@ -290,6 +267,29 @@ export default function fullcalendar({
                             }
                         }, 0)
                     }, true)
+
+                    // Fallback: observe icon/aria changes to persist state
+                    try {
+                        const observer = new MutationObserver(() => {
+                            const openGroups = collectOpenGroups()
+                            if (!arraysEqual(openGroups, this._lastSavedOpenGroups || [])) {
+                                this._lastSavedOpenGroups = openGroups
+                                debouncedSave(openGroups)
+                            }
+                        })
+                        observer.observe(container, {
+                            subtree: true,
+                            attributes: true,
+                            attributeFilter: ['class', 'aria-expanded'],
+                        })
+                        // Manual debug hook
+                        window.__fcSaveExpandedGroups = () => {
+                            const openGroups = collectOpenGroups()
+                            try { console.debug?.('[filament-fullcalendar] manual save, openGroups', openGroups) } catch (_) {}
+                            this._lastSavedOpenGroups = openGroups
+                            saveExpanded(openGroups)
+                        }
+                    } catch (_) {}
                 }
             } catch (e) { /* no-op */ }
 
@@ -652,7 +652,11 @@ export default function fullcalendar({
 					return null
 				}
 
+				// Init session set for idempotence
+				if (!this._expandedByPlugin) this._expandedByPlugin = new Set()
+
 				groupValues.forEach((gv) => {
+					if (this._expandedByPlugin.has(String(gv))) return
 					const label = findLabelForGroupValue(gv)
 					if (!label) {
 						try {
@@ -670,11 +674,12 @@ export default function fullcalendar({
 					const expander = row && row.querySelector ? row.querySelector('.fc-datagrid-expander') : null
 					if (expander) {
 						const icon = expander.querySelector('.fc-icon')
-						const isCollapsed = (icon && icon.classList.contains('fc-icon-chevron-right')) || expander.getAttribute('aria-expanded') === 'false'
-						const isExpanded = (icon && icon.classList.contains('fc-icon-chevron-down')) || expander.getAttribute('aria-expanded') === 'true'
+						const isCollapsed = !!(icon && icon.classList.contains('fc-icon-chevron-right'))
+						const isExpanded = !!(icon && icon.classList.contains('fc-icon-chevron-down'))
 						if (isCollapsed && !isExpanded) {
 							console.log('[filament-fullcalendar] expandGroupsByValues: opening group', gv)
 							expander.click()
+							this._expandedByPlugin.add(String(gv))
 						}
 					}
 				})
