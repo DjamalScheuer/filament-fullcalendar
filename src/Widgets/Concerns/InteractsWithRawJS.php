@@ -82,6 +82,9 @@ trait InteractsWithRawJS
      * Generated content is inserted inside the resource label element.
      * If supplied as a callback function, it is called every time the resource data is rendered.
      *
+     * NOTE: This hook only works when resourceAreaColumns is NOT used.
+     * For resourceAreaColumns, use resourceAreaColumnCellContent() instead.
+     *
      * @see https://fullcalendar.io/docs/resource-render-hooks
      *
      * @return string
@@ -102,6 +105,53 @@ trait InteractsWithRawJS
      * @return string
      */
     public function resourceLabelDidMount(): string
+    {
+        return <<<JS
+            null
+        JS;
+    }
+
+    /**
+     * A Content Injection Input for customizing the content of resourceAreaColumns cells.
+     * This callback is applied to ALL columns defined in resourceAreaColumns.
+     *
+     * The callback receives an object with:
+     * - resource: The Resource object
+     * - fieldValue: The value of the field for this column
+     * - view: The current View object
+     *
+     * You can check which column is being rendered via the fieldValue or resource properties.
+     *
+     * Example:
+     * ```php
+     * public function resourceAreaColumnCellContent(): string
+     * {
+     *     return <<<'JS'
+     *         function(arg) {
+     *             const resource = arg.resource;
+     *             const fieldValue = arg.fieldValue;
+     *
+     *             // Check which column based on fieldValue or use resource.extendedProps
+     *             if (fieldValue && fieldValue.includes && fieldValue.includes('\n')) {
+     *                 // Multi-line content - format with HTML
+     *                 const lines = fieldValue.split('\n');
+     *                 return {
+     *                     html: '<div style="line-height:1.4">' +
+     *                           lines.map(l => '<div>' + l + '</div>').join('') +
+     *                           '</div>'
+     *                 };
+     *             }
+     *             return null; // Use default rendering
+     *         }
+     *     JS;
+     * }
+     * ```
+     *
+     * @see https://fullcalendar.io/docs/resource-area-columns
+     *
+     * @return string
+     */
+    public function resourceAreaColumnCellContent(): string
     {
         return <<<JS
             null

@@ -53,6 +53,7 @@
                 resourceLabelDidMount: {!! htmlspecialchars($this->resourceLabelDidMount(), ENT_COMPAT) !!},
                 resourceLaneContent: {!! htmlspecialchars($this->resourceLaneContent(), ENT_COMPAT) !!},
                 resourceLaneDidMount: {!! htmlspecialchars($this->resourceLaneDidMount(), ENT_COMPAT) !!},
+                resourceAreaColumnCellContent: {!! htmlspecialchars($this->resourceAreaColumnCellContent(), ENT_COMPAT) !!},
                 persistedExpandedResources: @js($this->getPersistedExpandedResources()),
                 searchConfig: @js($this->getSearchConfig()),
             })">

@@ -33,6 +33,7 @@ export default function fullcalendar({
     resourceLabelDidMount,
     resourceLaneContent,
     resourceLaneDidMount,
+    resourceAreaColumnCellContent,
     persistedExpandedResources,
     searchConfig,
 }) {
@@ -42,6 +43,16 @@ export default function fullcalendar({
             const sanitizedConfig = { ...(config || {}) }
             if (sanitizedConfig && Object.prototype.hasOwnProperty.call(sanitizedConfig, 'search')) {
                 delete sanitizedConfig.search
+            }
+
+            // Apply resourceAreaColumnCellContent callback to all resourceAreaColumns if provided
+            if (resourceAreaColumnCellContent && typeof resourceAreaColumnCellContent === 'function') {
+                if (Array.isArray(sanitizedConfig.resourceAreaColumns)) {
+                    sanitizedConfig.resourceAreaColumns = sanitizedConfig.resourceAreaColumns.map(column => ({
+                        ...column,
+                        cellContent: resourceAreaColumnCellContent
+                    }))
+                }
             }
 
 			// Track currently highlighted event id (persist across re-renders)
