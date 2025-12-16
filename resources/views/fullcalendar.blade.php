@@ -49,6 +49,10 @@
                 eventDidMount: {!! htmlspecialchars($this->eventDidMount(), ENT_COMPAT) !!},
                 eventWillUnmount: {!! htmlspecialchars($this->eventWillUnmount(), ENT_COMPAT) !!},
                 resourceGroupLabelDidMount: {!! htmlspecialchars($this->resourceGroupLabelDidMount(), ENT_COMPAT) !!},
+                resourceLabelContent: {!! htmlspecialchars($this->resourceLabelContent(), ENT_COMPAT) !!},
+                resourceLabelDidMount: {!! htmlspecialchars($this->resourceLabelDidMount(), ENT_COMPAT) !!},
+                resourceLaneContent: {!! htmlspecialchars($this->resourceLaneContent(), ENT_COMPAT) !!},
+                resourceLaneDidMount: {!! htmlspecialchars($this->resourceLaneDidMount(), ENT_COMPAT) !!},
                 persistedExpandedResources: @js($this->getPersistedExpandedResources()),
                 searchConfig: @js($this->getSearchConfig()),
             })">

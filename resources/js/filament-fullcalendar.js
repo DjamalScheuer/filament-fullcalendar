@@ -29,6 +29,10 @@ export default function fullcalendar({
     eventDidMount,
     eventWillUnmount,
     resourceGroupLabelDidMount,
+    resourceLabelContent,
+    resourceLabelDidMount,
+    resourceLaneContent,
+    resourceLaneDidMount,
     persistedExpandedResources,
     searchConfig,
 }) {
@@ -131,6 +135,11 @@ export default function fullcalendar({
                     } catch (e) { /* no-op */ }
                     // Do not auto-click here to avoid race/toggle; expansion handled post-render
                 },
+                // Resource render hooks - allow custom content and styling for resource labels/lanes
+                resourceLabelContent: resourceLabelContent && typeof resourceLabelContent === 'function' ? resourceLabelContent : undefined,
+                resourceLabelDidMount: resourceLabelDidMount && typeof resourceLabelDidMount === 'function' ? resourceLabelDidMount : undefined,
+                resourceLaneContent: resourceLaneContent && typeof resourceLaneContent === 'function' ? resourceLaneContent : undefined,
+                resourceLaneDidMount: resourceLaneDidMount && typeof resourceLaneDidMount === 'function' ? resourceLaneDidMount : undefined,
                 datesSet: (info) => {
                     // Persist view and date whenever the visible range changes
                     try {

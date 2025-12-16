@@ -78,6 +78,67 @@ trait InteractsWithRawJS
     }
 
     /**
+     * A Content Injection Input for customizing the content of a resource's label.
+     * Generated content is inserted inside the resource label element.
+     * If supplied as a callback function, it is called every time the resource data is rendered.
+     *
+     * @see https://fullcalendar.io/docs/resource-render-hooks
+     *
+     * @return string
+     */
+    public function resourceLabelContent(): string
+    {
+        return <<<JS
+            null
+        JS;
+    }
+
+    /**
+     * Called right after the resource label element has been added to the DOM.
+     * If the resource data changes, this is NOT called again.
+     *
+     * @see https://fullcalendar.io/docs/resource-render-hooks
+     *
+     * @return string
+     */
+    public function resourceLabelDidMount(): string
+    {
+        return <<<JS
+            null
+        JS;
+    }
+
+    /**
+     * A Content Injection Input for customizing the content of a resource's lane (the horizontal area for events).
+     * Only available in timeline views.
+     *
+     * @see https://fullcalendar.io/docs/resource-render-hooks
+     *
+     * @return string
+     */
+    public function resourceLaneContent(): string
+    {
+        return <<<JS
+            null
+        JS;
+    }
+
+    /**
+     * Called right after a resource's lane has been added to the DOM.
+     * Only available in timeline views.
+     *
+     * @see https://fullcalendar.io/docs/resource-render-hooks
+     *
+     * @return string
+     */
+    public function resourceLaneDidMount(): string
+    {
+        return <<<JS
+            null
+        JS;
+    }
+
+    /**
      * Provide an array of resource IDs that should be initially expanded.
      * Only works with resourceTimeline view when resources have grouping.
      *
