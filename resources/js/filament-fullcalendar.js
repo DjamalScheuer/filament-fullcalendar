@@ -623,7 +623,29 @@ export default function fullcalendar({
 			return null
 		},
 		
-		tryExpandForEventWithRetries(calendar, event, attempt = 0) {
+		scrollToEventWithRetries(eventId, attempt = 0) {
+		const maxAttempts = 15
+		const delayMs = 250
+		const scope = this.$el || document
+		const eventEl = scope.querySelector(`[data-event-id="${eventId}"]`)
+
+		if (eventEl) {
+			eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+			eventEl.classList.add('fc-event-highlighted')
+			return
+		}
+
+		if (attempt >= maxAttempts) {
+			console.warn('[filament-fullcalendar] scrollToEvent: element not found after retries', eventId)
+			return
+		}
+
+		setTimeout(() => {
+			this.scrollToEventWithRetries(eventId, attempt + 1)
+		}, delayMs)
+	},
+
+	tryExpandForEventWithRetries(calendar, event, attempt = 0) {
 			const maxAttempts = 10
 			const delayMs = 200
 			const resourceIds = this.resolveEventResourceIds(calendar, event)
@@ -905,19 +927,10 @@ export default function fullcalendar({
 					console.log('[filament-fullcalendar] getResourceGroupsForEvent not available on $wire')
 				}
 					
-					// Expand resource groups (if any) so the event row becomes visible
-					setTimeout(() => this.tryExpandForEventWithRetries(calendar, event, 0), 200)
-					// Scroll into view after render and expansion
-					setTimeout(() => {
-						const scope = this.$el || document
-						const eventEl = scope.querySelector(`[data-event-id="${event.id}"]`)
-						console.log('[filament-fullcalendar] locating event element after expansion', { found: !!eventEl })
-						if (eventEl) {
-							eventEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-							// Ensure class present if rerender missed
-							eventEl.classList.add('fc-event-highlighted')
-						}
-					}, 350)
+				// Expand resource groups (if any) so the event row becomes visible
+				setTimeout(() => this.tryExpandForEventWithRetries(calendar, event, 0), 200)
+				// Scroll into view after render and expansion (retry until DOM element exists)
+				setTimeout(() => this.scrollToEventWithRetries(event.id, 0), 250)
                     
                     // Hide search results
                     searchResultsContainer.classList.add('hidden')
