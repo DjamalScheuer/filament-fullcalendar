@@ -161,13 +161,21 @@ export default function fullcalendar({
                         this.persistCalendarState(info.view.calendar)
                     } catch (e) { /* no-op */ }
 
-                    // Prepend calendar week number to title in week views
-                    if (weekNumberInTitle && info.view.type.toLowerCase().includes('week')) {
+                    // Show calendar week number in title for week views
+                    if (weekNumberInTitle) {
                         try {
-                            const weekNum = this.getISOWeekNumber(info.view.currentStart)
                             const titleEl = this.$el.querySelector('.fc-toolbar-title')
                             if (titleEl) {
-                                titleEl.textContent = `KW ${weekNum} · ${info.view.title}`
+                                const existing = titleEl.querySelector('.fc-kw-prefix')
+                                if (existing) existing.remove()
+
+                                if (info.view.type.toLowerCase().includes('week')) {
+                                    const weekNum = this.getISOWeekNumber(info.view.currentStart)
+                                    const prefix = document.createElement('span')
+                                    prefix.className = 'fc-kw-prefix'
+                                    prefix.textContent = `KW ${weekNum} \u00B7 `
+                                    titleEl.prepend(prefix)
+                                }
                             }
                         } catch (e) { /* no-op */ }
                     }
@@ -633,6 +641,7 @@ export default function fullcalendar({
 			const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
 			return Math.ceil(((d - yearStart) / 86400000 + 1) / 7)
 		},
+
 
 		parseDateSafe(value) {
 			if (value instanceof Date) return value
