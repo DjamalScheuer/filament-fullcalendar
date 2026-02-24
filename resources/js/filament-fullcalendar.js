@@ -44,6 +44,10 @@ export default function fullcalendar({
             if (sanitizedConfig && Object.prototype.hasOwnProperty.call(sanitizedConfig, 'search')) {
                 delete sanitizedConfig.search
             }
+            const weekNumberInTitle = sanitizedConfig.weekNumberInTitle || false
+            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'weekNumberInTitle')) {
+                delete sanitizedConfig.weekNumberInTitle
+            }
 
             // Apply resourceAreaColumnCellContent callback to all resourceAreaColumns if provided
             if (resourceAreaColumnCellContent && typeof resourceAreaColumnCellContent === 'function') {
@@ -156,6 +160,17 @@ export default function fullcalendar({
                     try {
                         this.persistCalendarState(info.view.calendar)
                     } catch (e) { /* no-op */ }
+
+                    // Prepend calendar week number to title in week views
+                    if (weekNumberInTitle && info.view.type.toLowerCase().includes('week')) {
+                        try {
+                            const weekNum = this.getISOWeekNumber(info.view.currentStart)
+                            const titleEl = this.$el.querySelector('.fc-toolbar-title')
+                            if (titleEl && !titleEl.textContent.startsWith('KW ')) {
+                                titleEl.textContent = `KW ${weekNum} · ${titleEl.textContent}`
+                            }
+                        } catch (e) { /* no-op */ }
+                    }
                 },
                 events: (info, successCallback, failureCallback) => {
                     this.$wire.fetchEvents({ start: info.startStr, end: info.endStr, timezone: info.timeZone })
@@ -612,6 +627,13 @@ export default function fullcalendar({
 			return Array.from(ids)
 		},
 		
+		getISOWeekNumber(date) {
+			const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+			d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
+			const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+			return Math.ceil(((d - yearStart) / 86400000 + 1) / 7)
+		},
+
 		parseDateSafe(value) {
 			if (value instanceof Date) return value
 			if (typeof value === 'string') {
