@@ -166,8 +166,8 @@ export default function fullcalendar({
                         try {
                             const weekNum = this.getISOWeekNumber(info.view.currentStart)
                             const titleEl = this.$el.querySelector('.fc-toolbar-title')
-                            if (titleEl && !titleEl.textContent.startsWith('KW ')) {
-                                titleEl.textContent = `KW ${weekNum} · ${titleEl.textContent}`
+                            if (titleEl) {
+                                titleEl.textContent = `KW ${weekNum} · ${info.view.title}`
                             }
                         } catch (e) { /* no-op */ }
                     }
