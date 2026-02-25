@@ -599,8 +599,11 @@ export default function fullcalendar({
         
         initExternalDraggable(containerSelector, itemSelector) {
             let initTimer = null
+            let isDragging = false
 
             const doInit = () => {
+                if (isDragging) return true
+
                 const container = document.querySelector(containerSelector)
                 if (!container) return false
 
@@ -619,34 +622,43 @@ export default function fullcalendar({
                         }
                     },
                 })
+
+                container.addEventListener('pointerdown', (e) => {
+                    if (e.target.closest(itemSelector)) isDragging = true
+                }, { capture: true })
+
+                const stopDragging = () => { isDragging = false }
+                document.addEventListener('pointerup', stopDragging)
+                document.addEventListener('pointercancel', stopDragging)
+
                 return true
             }
 
             const debouncedInit = () => {
+                if (isDragging) return
                 if (initTimer) clearTimeout(initTimer)
                 initTimer = setTimeout(doInit, 80)
             }
 
-            // Initial attempt; if container isn't rendered yet, the observer will catch it
             doInit()
 
-            // Re-initialize after Livewire morphs (table/sidebar re-renders)
             if (typeof Livewire !== 'undefined') {
                 Livewire.hook('morph.updated', ({ el }) => {
+                    if (isDragging) return
                     const container = document.querySelector(containerSelector)
                     if (container && (el === container || container.contains(el) || el.contains(container))) {
                         debouncedInit()
                     }
                 })
-                // Also handle full component re-initializations
                 Livewire.hook('element.init', () => {
+                    if (isDragging) return
                     const container = document.querySelector(containerSelector)
                     if (container) debouncedInit()
                 })
             }
 
-            // Fallback: MutationObserver for late-rendered or non-Livewire containers
             const observer = new MutationObserver(() => {
+                if (isDragging) return
                 const container = document.querySelector(containerSelector)
                 if (container) debouncedInit()
             })
