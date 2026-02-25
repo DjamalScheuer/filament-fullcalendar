@@ -56,6 +56,9 @@
                 resourceAreaColumnCellContent: {!! htmlspecialchars($this->resourceAreaColumnCellContent(), ENT_COMPAT) !!},
                 persistedExpandedResources: @js($this->getPersistedExpandedResources()),
                 searchConfig: @js($this->getSearchConfig()),
+                droppable: @json($plugin->isDroppable()),
+                externalEventContainer: @js($plugin->getExternalEventContainer()),
+                externalEventItem: @js($plugin->getExternalEventItem()),
             })">
         </div>
     </x-filament::section>

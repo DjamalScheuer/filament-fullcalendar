@@ -21,6 +21,12 @@ class FilamentFullCalendarPlugin implements Plugin
 
     protected ?bool $selectable = null;
 
+    protected ?bool $droppable = null;
+
+    protected ?string $externalEventContainer = null;
+
+    protected ?string $externalEventItem = null;
+
     public function getId(): string
     {
         return 'filament-fullcalendar';
@@ -128,5 +134,29 @@ class FilamentFullCalendarPlugin implements Plugin
     public function isSelectable(): bool
     {
         return $this->selectable ?? data_get($this->config, 'selectable', false);
+    }
+
+    public function droppable(bool $droppable = true, ?string $containerSelector = null, ?string $itemSelector = null): static
+    {
+        $this->droppable = $droppable;
+        $this->externalEventContainer = $containerSelector;
+        $this->externalEventItem = $itemSelector;
+
+        return $this;
+    }
+
+    public function isDroppable(): bool
+    {
+        return $this->droppable ?? false;
+    }
+
+    public function getExternalEventContainer(): ?string
+    {
+        return $this->externalEventContainer;
+    }
+
+    public function getExternalEventItem(): ?string
+    {
+        return $this->externalEventItem;
     }
 }

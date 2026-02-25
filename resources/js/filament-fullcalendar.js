@@ -1,5 +1,5 @@
 import { Calendar } from '@fullcalendar/core'
-import interactionPlugin from '@fullcalendar/interaction'
+import interactionPlugin, { Draggable } from '@fullcalendar/interaction'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
@@ -36,6 +36,9 @@ export default function fullcalendar({
     resourceAreaColumnCellContent,
     persistedExpandedResources,
     searchConfig,
+    droppable,
+    externalEventContainer,
+    externalEventItem,
 }) {
     return {
         init() {
@@ -217,6 +220,24 @@ export default function fullcalendar({
                     if (!selectable) return;
                     this.$wire.onDateSelect(startStr, endStr, allDay, view, resource)
                 },
+                droppable: droppable || false,
+                drop: droppable ? ({ dateStr, allDay, draggedEl, resource, view }) => {
+                    let eventData = {}
+                    try {
+                        eventData = JSON.parse(draggedEl.getAttribute('data-event') || '{}')
+                    } catch (e) {
+                        console.warn('[filament-fullcalendar] Could not parse data-event attribute:', e)
+                    }
+                    this.$wire.onExternalEventDrop(
+                        eventData,
+                        dateStr,
+                        allDay,
+                        resource ? { id: resource.id, title: resource.title, extendedProps: resource.extendedProps } : null
+                    )
+                } : undefined,
+                eventReceive: droppable ? ({ event }) => {
+                    event.remove()
+                } : undefined,
             })
 
             calendar.render()
@@ -363,6 +384,11 @@ export default function fullcalendar({
 				`
 				document.head.appendChild(style)
 			}
+
+            // Initialize external event dragging if enabled
+            if (droppable && externalEventContainer) {
+                this.initExternalDraggable(externalEventContainer, externalEventItem || '[data-event]')
+            }
 
             // Initialize search functionality if enabled
             if (searchConfig && searchConfig.enabled) {
@@ -571,6 +597,63 @@ export default function fullcalendar({
             })
         },
         
+        initExternalDraggable(containerSelector, itemSelector) {
+            let initTimer = null
+
+            const doInit = () => {
+                const container = document.querySelector(containerSelector)
+                if (!container) return false
+
+                if (this._externalDraggable) {
+                    this._externalDraggable.destroy()
+                    this._externalDraggable = null
+                }
+
+                this._externalDraggable = new Draggable(container, {
+                    itemSelector: itemSelector,
+                    eventData: (el) => {
+                        try {
+                            return JSON.parse(el.getAttribute('data-event') || '{}')
+                        } catch (e) {
+                            return {}
+                        }
+                    },
+                })
+                return true
+            }
+
+            const debouncedInit = () => {
+                if (initTimer) clearTimeout(initTimer)
+                initTimer = setTimeout(doInit, 80)
+            }
+
+            // Initial attempt; if container isn't rendered yet, the observer will catch it
+            doInit()
+
+            // Re-initialize after Livewire morphs (table/sidebar re-renders)
+            if (typeof Livewire !== 'undefined') {
+                Livewire.hook('morph.updated', ({ el }) => {
+                    const container = document.querySelector(containerSelector)
+                    if (container && (el === container || container.contains(el) || el.contains(container))) {
+                        debouncedInit()
+                    }
+                })
+                // Also handle full component re-initializations
+                Livewire.hook('element.init', () => {
+                    const container = document.querySelector(containerSelector)
+                    if (container) debouncedInit()
+                })
+            }
+
+            // Fallback: MutationObserver for late-rendered or non-Livewire containers
+            const observer = new MutationObserver(() => {
+                const container = document.querySelector(containerSelector)
+                if (container) debouncedInit()
+            })
+            observer.observe(document.body, { childList: true, subtree: true })
+            this._externalDraggableObserver = observer
+        },
+
 		resolveEventResourceIds(calendar, event) {
 			const ids = new Set()
 			try {

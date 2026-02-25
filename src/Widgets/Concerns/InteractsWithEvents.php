@@ -102,6 +102,28 @@ trait InteractsWithEvents
         ]);
     }
 
+    /**
+     * Triggered when an external element is dropped onto the calendar.
+     * @param array $eventData Data extracted from the dragged element's data-event attribute.
+     * @param string $dateStr An ISO8601 string of the drop target date/time.
+     * @param bool $allDay Whether the drop target is an all-day slot.
+     * @param ?array $resource A Resource Object if dropped on a resource view.
+     * @return void
+     */
+    public function onExternalEventDrop(array $eventData, string $dateStr, bool $allDay, ?array $resource): void
+    {
+        $timezone = FilamentFullCalendarPlugin::make()->getTimezone();
+        $start = Carbon::parse($dateStr, $timezone);
+
+        $this->mountAction('create', [
+            'type' => 'external-drop',
+            'event' => $eventData,
+            'start' => $start,
+            'allDay' => $allDay,
+            'resource' => $resource,
+        ]);
+    }
+
     public function refreshRecords(): void
     {
         $this->dispatch('filament-fullcalendar--refresh');
