@@ -51,6 +51,10 @@ export default function fullcalendar({
             if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'weekNumberInTitle')) {
                 delete sanitizedConfig.weekNumberInTitle
             }
+            const kwDropdown = sanitizedConfig.kwDropdown || false
+            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'kwDropdown')) {
+                delete sanitizedConfig.kwDropdown
+            }
 
             // Apply resourceAreaColumnCellContent callback to all resourceAreaColumns if provided
             if (resourceAreaColumnCellContent && typeof resourceAreaColumnCellContent === 'function') {
@@ -182,6 +186,13 @@ export default function fullcalendar({
                             }
                         } catch (e) { /* no-op */ }
                     }
+
+                    // Update KW dropdown selection and visibility
+                    if (kwDropdown && this._kwDropdownSelect) {
+                        try {
+                            this.updateKwDropdown(this._kwDropdownSelect, info)
+                        } catch (e) { /* no-op */ }
+                    }
                 },
                 events: (info, successCallback, failureCallback) => {
                     this.$wire.fetchEvents({ start: info.startStr, end: info.endStr, timezone: info.timeZone })
@@ -241,6 +252,11 @@ export default function fullcalendar({
             })
 
             calendar.render()
+
+            // Create KW dropdown after render so toolbar DOM exists
+            if (kwDropdown) {
+                this._kwDropdownSelect = this.createKwDropdown(calendar)
+            }
 
             // Apply persisted expanded groups shortly after initial render to ensure DOM is ready
             try {
@@ -737,6 +753,84 @@ export default function fullcalendar({
 			return Math.ceil(((d - yearStart) / 86400000 + 1) / 7)
 		},
 
+		getMondayOfISOWeek(week, year) {
+			const jan4 = new Date(Date.UTC(year, 0, 4))
+			const dayOfWeek = jan4.getUTCDay() || 7
+			const monday = new Date(jan4)
+			monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (week - 1) * 7)
+			return monday
+		},
+
+		getISOWeeksInYear(year) {
+			const dec28 = new Date(Date.UTC(year, 11, 28))
+			return this.getISOWeekNumber(dec28)
+		},
+
+		createKwDropdown(calendar) {
+			const toolbarCenter = this.$el.querySelector('.fc-toolbar-chunk:nth-child(2)')
+			if (!toolbarCenter) return null
+
+			const wrapper = document.createElement('div')
+			wrapper.className = 'fc-kw-dropdown-wrapper'
+
+			const select = document.createElement('select')
+			select.className = 'fc-kw-dropdown'
+			select.title = 'Kalenderwoche auswählen'
+
+			select.addEventListener('change', () => {
+				const val = select.value
+				if (!val) return
+				const [week, year] = val.split('-').map(Number)
+				const monday = this.getMondayOfISOWeek(week, year)
+				calendar.gotoDate(monday)
+			})
+
+			wrapper.appendChild(select)
+			toolbarCenter.appendChild(wrapper)
+			return select
+		},
+
+		updateKwDropdown(select, viewInfo) {
+			if (!select) return
+
+			const viewType = viewInfo.view.type.toLowerCase()
+			const isRelevantView = viewType.includes('week') || viewType.includes('month') || viewType.includes('timeline')
+			const wrapper = select.closest('.fc-kw-dropdown-wrapper')
+			if (wrapper) wrapper.style.display = isRelevantView ? '' : 'none'
+			if (!isRelevantView) return
+
+			const currentStart = viewInfo.view.currentStart
+			const currentYear = currentStart.getFullYear()
+			const currentWeek = this.getISOWeekNumber(currentStart)
+
+			const rangeStart = viewInfo.start || viewInfo.view.activeStart
+			const rangeEnd = viewInfo.end || viewInfo.view.activeEnd
+			const startYear = rangeStart ? rangeStart.getFullYear() : currentYear
+			const endYear = rangeEnd ? rangeEnd.getFullYear() : currentYear
+			const minYear = Math.min(startYear, currentYear)
+			const maxYear = Math.max(endYear, currentYear)
+
+			const prevValue = select.value
+			select.innerHTML = ''
+
+			const placeholder = document.createElement('option')
+			placeholder.value = ''
+			placeholder.textContent = 'KW…'
+			placeholder.disabled = true
+			select.appendChild(placeholder)
+
+			for (let y = minYear; y <= maxYear; y++) {
+				const totalWeeks = this.getISOWeeksInYear(y)
+				for (let w = 1; w <= totalWeeks; w++) {
+					const opt = document.createElement('option')
+					opt.value = `${w}-${y}`
+					opt.textContent = y === currentYear ? `KW ${w}` : `KW ${w} (${y})`
+					select.appendChild(opt)
+				}
+			}
+
+			select.value = `${currentWeek}-${currentYear}`
+		},
 
 		parseDateSafe(value) {
 			if (value instanceof Date) return value
