@@ -775,9 +775,7 @@ export default function fullcalendar({
 		},
 
 		createKwDropdown(calendar) {
-			const calendarEl = this.$el
-			const sectionEl = calendarEl.closest('.fi-section') || calendarEl.parentElement
-			const headerBar = sectionEl ? sectionEl.querySelector('.flex.items-center.mb-4') : null
+			const headerBar = this.$el.previousElementSibling
 			if (!headerBar) return null
 
 			const wrapper = document.createElement('div')
@@ -797,11 +795,10 @@ export default function fullcalendar({
 
 			wrapper.appendChild(select)
 
-			const searchWrapper = headerBar.querySelector('#calendar-search-input')?.closest('.relative.ml-auto')
+			const searchWrapper = headerBar.querySelector('#calendar-search-input')?.closest('.relative')
 			if (searchWrapper) {
 				headerBar.insertBefore(wrapper, searchWrapper)
 			} else {
-				wrapper.classList.add('ml-auto')
 				headerBar.appendChild(wrapper)
 			}
 
