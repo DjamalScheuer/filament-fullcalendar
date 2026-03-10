@@ -785,10 +785,47 @@ export default function fullcalendar({
 				if (!val) return
 				const [week, year] = val.split('-').map(Number)
 				const monday = this.getMondayOfISOWeek(week, year)
-				calendar.gotoDate(monday)
+				const dateStr = monday.toISOString().split('T')[0]
+
+				const viewType = calendar.view.type.toLowerCase()
+				if (viewType.includes('month')) {
+					calendar.gotoDate(monday)
+					setTimeout(() => this.scrollToDate(dateStr), 150)
+				} else {
+					calendar.gotoDate(monday)
+				}
 			})
 
 			return select
+		},
+
+		scrollToDate(dateStr) {
+			const calEl = this.$el
+			const cell = calEl.querySelector(`[data-date="${dateStr}"]`)
+				|| calEl.querySelector(`td[data-date="${dateStr}"]`)
+				|| calEl.querySelector(`th[data-date="${dateStr}"]`)
+			if (!cell) return
+
+			const isTimeline = !!calEl.querySelector('.fc-timeline-body')
+			if (isTimeline) {
+				const scrollContainer = cell.closest('.fc-timeline-body')
+					|| cell.closest('.fc-scroller')
+					|| cell.closest('[class*="fc-scroller"]')
+				if (scrollContainer) {
+					const offset = cell.offsetLeft || cell.getBoundingClientRect().left - scrollContainer.getBoundingClientRect().left
+					scrollContainer.scrollTo({ left: offset, behavior: 'smooth' })
+				} else {
+					cell.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+				}
+			} else {
+				const row = cell.closest('tr') || cell.closest('.fc-daygrid-week-row') || cell.parentElement
+				if (row) {
+					row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+					cell.style.transition = 'background-color 0.3s ease'
+					cell.style.backgroundColor = 'rgba(var(--primary-500), 0.25)'
+					setTimeout(() => { cell.style.backgroundColor = '' }, 1500)
+				}
+			}
 		},
 
 		updateKwDropdown(select, viewInfo) {
