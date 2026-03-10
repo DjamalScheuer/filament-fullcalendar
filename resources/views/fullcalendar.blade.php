@@ -1,6 +1,7 @@
 @php
     $plugin = \Saade\FilamentFullCalendar\FilamentFullCalendarPlugin::get();
     $config = $this->getConfig();
+    $kwDropdownEnabled = $config['kwDropdown'] ?? false;
     if (is_array($config) && array_key_exists('search', $config)) {
         unset($config['search']);
     }
@@ -10,6 +11,14 @@
     <x-filament::section>
         <div class="flex items-center mb-4 gap-4">
             <x-filament-actions::actions :actions="$this->getCachedHeaderActions()" class="shrink-0" />
+
+            @if($kwDropdownEnabled)
+                <div class="fc-kw-dropdown-wrapper @if(!($this->getSearchConfig()['enabled'] ?? false)) ml-auto @endif">
+                    <select id="fc-kw-dropdown" class="fc-kw-dropdown" title="Kalenderwoche auswählen">
+                        <option value="" disabled selected>KW…</option>
+                    </select>
+                </div>
+            @endif
             
             @if($this->getSearchConfig()['enabled'] ?? false)
                 <div class="relative ml-auto">

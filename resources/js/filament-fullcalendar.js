@@ -775,15 +775,8 @@ export default function fullcalendar({
 		},
 
 		createKwDropdown(calendar) {
-			const headerBar = this.$el.previousElementSibling
-			if (!headerBar) return null
-
-			const wrapper = document.createElement('div')
-			wrapper.className = 'fc-kw-dropdown-wrapper'
-
-			const select = document.createElement('select')
-			select.className = 'fc-kw-dropdown'
-			select.title = 'Kalenderwoche auswählen'
+			const select = document.getElementById('fc-kw-dropdown')
+			if (!select) return null
 
 			select.addEventListener('change', () => {
 				const val = select.value
@@ -792,15 +785,6 @@ export default function fullcalendar({
 				const monday = this.getMondayOfISOWeek(week, year)
 				calendar.gotoDate(monday)
 			})
-
-			wrapper.appendChild(select)
-
-			const searchWrapper = headerBar.querySelector('#calendar-search-input')?.closest('.relative')
-			if (searchWrapper) {
-				headerBar.insertBefore(wrapper, searchWrapper)
-			} else {
-				headerBar.appendChild(wrapper)
-			}
 
 			return select
 		},
