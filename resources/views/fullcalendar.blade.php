@@ -13,7 +13,7 @@
             <x-filament-actions::actions :actions="$this->getCachedHeaderActions()" class="shrink-0" />
 
             @if($kwDropdownEnabled)
-                <div class="fc-kw-dropdown-wrapper @if(!($this->getSearchConfig()['enabled'] ?? false)) ml-auto @endif">
+                <div class="fc-kw-dropdown-wrapper @if(!($this->getSearchConfig()['enabled'] ?? false)) ml-auto @endif" wire:ignore>
                     <select id="fc-kw-dropdown" class="fc-kw-dropdown" title="Kalenderwoche auswählen">
                         <option value="" disabled selected>KW…</option>
                     </select>

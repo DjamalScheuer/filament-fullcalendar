@@ -188,9 +188,10 @@ export default function fullcalendar({
                     }
 
                     // Update KW dropdown selection and visibility
-                    if (kwDropdown && this._kwDropdownSelect) {
+                    if (kwDropdown) {
                         try {
-                            this.updateKwDropdown(this._kwDropdownSelect, info)
+                            const kwSelect = document.getElementById('fc-kw-dropdown')
+                            if (kwSelect) this.updateKwDropdown(kwSelect, info)
                         } catch (e) { /* no-op */ }
                     }
                 },
@@ -253,12 +254,13 @@ export default function fullcalendar({
 
             calendar.render()
 
-            // Create KW dropdown after render so toolbar DOM exists
+            // Initialize KW dropdown: attach change listener and populate options
             if (kwDropdown) {
-                this._kwDropdownSelect = this.createKwDropdown(calendar)
-                if (this._kwDropdownSelect) {
+                this.createKwDropdown(calendar)
+                const kwSelect = document.getElementById('fc-kw-dropdown')
+                if (kwSelect) {
                     const view = calendar.view
-                    this.updateKwDropdown(this._kwDropdownSelect, {
+                    this.updateKwDropdown(kwSelect, {
                         view,
                         start: view.activeStart,
                         end: view.activeEnd,
