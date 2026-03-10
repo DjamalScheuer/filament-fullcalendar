@@ -256,6 +256,14 @@ export default function fullcalendar({
             // Create KW dropdown after render so toolbar DOM exists
             if (kwDropdown) {
                 this._kwDropdownSelect = this.createKwDropdown(calendar)
+                if (this._kwDropdownSelect) {
+                    const view = calendar.view
+                    this.updateKwDropdown(this._kwDropdownSelect, {
+                        view,
+                        start: view.activeStart,
+                        end: view.activeEnd,
+                    })
+                }
             }
 
             // Apply persisted expanded groups shortly after initial render to ensure DOM is ready
@@ -767,8 +775,10 @@ export default function fullcalendar({
 		},
 
 		createKwDropdown(calendar) {
-			const toolbarCenter = this.$el.querySelector('.fc-toolbar-chunk:nth-child(2)')
-			if (!toolbarCenter) return null
+			const calendarEl = this.$el
+			const sectionEl = calendarEl.closest('.fi-section') || calendarEl.parentElement
+			const headerBar = sectionEl ? sectionEl.querySelector('.flex.items-center.mb-4') : null
+			if (!headerBar) return null
 
 			const wrapper = document.createElement('div')
 			wrapper.className = 'fc-kw-dropdown-wrapper'
@@ -786,7 +796,15 @@ export default function fullcalendar({
 			})
 
 			wrapper.appendChild(select)
-			toolbarCenter.appendChild(wrapper)
+
+			const searchWrapper = headerBar.querySelector('#calendar-search-input')?.closest('.relative.ml-auto')
+			if (searchWrapper) {
+				headerBar.insertBefore(wrapper, searchWrapper)
+			} else {
+				wrapper.classList.add('ml-auto')
+				headerBar.appendChild(wrapper)
+			}
+
 			return select
 		},
 
