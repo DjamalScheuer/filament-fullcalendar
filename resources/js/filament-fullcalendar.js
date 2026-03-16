@@ -43,8 +43,27 @@ export default function fullcalendar({
 }) {
     return {
         init() {
-            // Inject reorder visual feedback styles once (only when reorderable is enabled)
-            if (reorderable && !document.getElementById('fc-reorder-styles')) {
+            // Remove any non-FullCalendar options from config to avoid runtime warnings
+            const sanitizedConfig = { ...(config || {}) }
+            if (sanitizedConfig && Object.prototype.hasOwnProperty.call(sanitizedConfig, 'search')) {
+                delete sanitizedConfig.search
+            }
+            const weekNumberInTitle = sanitizedConfig.weekNumberInTitle || false
+            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'weekNumberInTitle')) {
+                delete sanitizedConfig.weekNumberInTitle
+            }
+            const kwDropdown = sanitizedConfig.kwDropdown || false
+            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'kwDropdown')) {
+                delete sanitizedConfig.kwDropdown
+            }
+            // Widget-level config overrides plugin-level reorderable
+            const isReorderable = Object.prototype.hasOwnProperty.call(sanitizedConfig, 'reorderable')
+                ? !!sanitizedConfig.reorderable
+                : !!reorderable
+            delete sanitizedConfig.reorderable
+
+            // Inject reorder visual feedback styles once
+            if (isReorderable && !document.getElementById('fc-reorder-styles')) {
                 const style = document.createElement('style')
                 style.id = 'fc-reorder-styles'
                 style.textContent = `
@@ -85,25 +104,6 @@ export default function fullcalendar({
                 document.head.appendChild(style)
             }
 
-            // Remove any non-FullCalendar options from config to avoid runtime warnings
-            const sanitizedConfig = { ...(config || {}) }
-            if (sanitizedConfig && Object.prototype.hasOwnProperty.call(sanitizedConfig, 'search')) {
-                delete sanitizedConfig.search
-            }
-            const weekNumberInTitle = sanitizedConfig.weekNumberInTitle || false
-            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'weekNumberInTitle')) {
-                delete sanitizedConfig.weekNumberInTitle
-            }
-            const kwDropdown = sanitizedConfig.kwDropdown || false
-            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'kwDropdown')) {
-                delete sanitizedConfig.kwDropdown
-            }
-            // Allow widget-level config to override plugin-level reorderable
-            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'reorderable')) {
-                reorderable = sanitizedConfig.reorderable
-                delete sanitizedConfig.reorderable
-            }
-
             // Apply resourceAreaColumnCellContent callback to all resourceAreaColumns if provided
             if (resourceAreaColumnCellContent && typeof resourceAreaColumnCellContent === 'function') {
                 if (Array.isArray(sanitizedConfig.resourceAreaColumns)) {
@@ -142,7 +142,7 @@ export default function fullcalendar({
             }
 
 			// Wrap eventOrder to prioritize sort_order from extendedProps (only when reorderable)
-			if (reorderable) {
+			if (isReorderable) {
 				const userEventOrder = sanitizedConfig.eventOrder
 				sanitizedConfig.eventOrder = function(a, b) {
 					const orderA = a.extendedProps?.sort_order ?? 999999
@@ -277,14 +277,14 @@ export default function fullcalendar({
                     this.$wire.onEventClick(event)
                 },
                 eventDrop: async ({ event, oldEvent, relatedEvents, delta, oldResource, newResource, revert }) => {
-                    if (reorderable) this._lastDropHandled = true
+                    if (isReorderable) this._lastDropHandled = true
                     const shouldRevert = await this.$wire.onEventDrop(event, oldEvent, relatedEvents, delta, oldResource, newResource)
 
                     if (typeof shouldRevert === 'boolean' && shouldRevert) {
                         revert()
                     }
                 },
-                eventDragStart: !reorderable ? undefined : ({ event }) => {
+                eventDragStart: !isReorderable ? undefined : ({ event }) => {
                     this._reorderDragEvent = event
                     const resources = event.getResources()
                     const resourceId = resources.length > 0 ? resources[0].id : null
@@ -372,7 +372,7 @@ export default function fullcalendar({
 
                     document.addEventListener('mousemove', this._reorderDragHandler)
                 },
-                eventDragStop: !reorderable ? undefined : ({ event, jsEvent }) => {
+                eventDragStop: !isReorderable ? undefined : ({ event, jsEvent }) => {
                     if (this._reorderDragHandler) {
                         document.removeEventListener('mousemove', this._reorderDragHandler)
                         this._reorderDragHandler = null
