@@ -72,6 +72,11 @@ export default function fullcalendar({
 			// Flag to prevent eventDragStop from handling reorder when eventDrop already handled a cross-cell move
 			this._lastDropHandled = false
 
+			// Reorder visual feedback state
+			this._reorderIndicator = null
+			this._reorderDragHandler = null
+			this._reorderDragEvent = null
+
             // Restore persisted calendar state (view/date/scroll) from sessionStorage
             const storageKey = this.getCalendarStorageKey()
             let savedState = null
@@ -231,7 +236,88 @@ export default function fullcalendar({
                         revert()
                     }
                 },
+                eventDragStart: ({ event }) => {
+                    this._reorderDragEvent = event
+                    const resources = event.getResources()
+                    const resourceId = resources.length > 0 ? resources[0].id : null
+                    const eventStartDate = event.startStr ? event.startStr.substring(0, 10) : null
+
+                    const allEvents = calendar.getEvents()
+                    const sameSlotEvents = allEvents.filter(e => {
+                        const eRes = e.getResources()
+                        const eResId = eRes.length > 0 ? eRes[0].id : null
+                        const eDate = e.startStr ? e.startStr.substring(0, 10) : null
+                        return eResId === resourceId && eDate === eventStartDate
+                    })
+
+                    if (sameSlotEvents.length <= 1) return
+
+                    const siblings = []
+                    for (const sib of sameSlotEvents) {
+                        if (String(sib.id) === String(event.id)) continue
+                        const el = this.$el.querySelector(`[data-event-id="${sib.id}"]`)
+                        if (!el) continue
+                        const rect = el.getBoundingClientRect()
+                        siblings.push({ el, top: rect.top, bottom: rect.bottom, midY: rect.top + rect.height / 2 })
+                    }
+
+                    if (siblings.length === 0) return
+
+                    siblings.sort((a, b) => a.top - b.top)
+                    const laneEl = siblings[0].el.closest('.fc-timeline-lane-frame') || siblings[0].el.parentElement
+
+                    const indicator = document.createElement('div')
+                    indicator.className = 'fc-reorder-indicator'
+                    indicator.style.display = 'none'
+                    if (laneEl) {
+                        laneEl.style.position = 'relative'
+                        laneEl.appendChild(indicator)
+                    }
+                    this._reorderIndicator = indicator
+
+                    this._reorderDragHandler = (moveEvent) => {
+                        const mouseY = moveEvent.clientY
+                        const laneRect = laneEl.getBoundingClientRect()
+
+                        let isOverLane = mouseY >= laneRect.top && mouseY <= laneRect.bottom &&
+                            moveEvent.clientX >= laneRect.left && moveEvent.clientX <= laneRect.right
+
+                        if (!isOverLane) {
+                            indicator.style.display = 'none'
+                            return
+                        }
+
+                        let indicatorY
+                        if (mouseY < siblings[0].midY) {
+                            indicatorY = siblings[0].top - laneRect.top - 2
+                        } else if (mouseY >= siblings[siblings.length - 1].midY) {
+                            indicatorY = siblings[siblings.length - 1].bottom - laneRect.top + 1
+                        } else {
+                            for (let i = 0; i < siblings.length - 1; i++) {
+                                if (mouseY >= siblings[i].midY && mouseY < siblings[i + 1].midY) {
+                                    indicatorY = (siblings[i].bottom + siblings[i + 1].top) / 2 - laneRect.top
+                                    break
+                                }
+                            }
+                        }
+
+                        indicator.style.display = 'block'
+                        indicator.style.top = indicatorY + 'px'
+                    }
+
+                    document.addEventListener('mousemove', this._reorderDragHandler)
+                },
                 eventDragStop: ({ event, jsEvent }) => {
+                    if (this._reorderDragHandler) {
+                        document.removeEventListener('mousemove', this._reorderDragHandler)
+                        this._reorderDragHandler = null
+                    }
+                    if (this._reorderIndicator) {
+                        this._reorderIndicator.remove()
+                        this._reorderIndicator = null
+                    }
+                    this._reorderDragEvent = null
+
                     this._lastDropHandled = false
                     const dropMouseY = jsEvent.clientY
 
@@ -301,14 +387,26 @@ export default function fullcalendar({
                             extendedProps: resources[0].extendedProps,
                         } : null
 
+                        const movedEventId = String(event.id)
+
                         await this.$wire.onEventReorder(
-                            String(event.id),
+                            movedEventId,
                             orderedIds,
                             resource,
                             eventStartDate
                         )
 
                         calendar.refetchEvents()
+
+                        setTimeout(() => {
+                            const movedEl = this.$el.querySelector(`[data-event-id="${movedEventId}"]`)
+                            if (movedEl) {
+                                movedEl.classList.add('fc-event-reordered')
+                                movedEl.addEventListener('animationend', () => {
+                                    movedEl.classList.remove('fc-event-reordered')
+                                }, { once: true })
+                            }
+                        }, 300)
                     }, 150)
                 },
                 eventResize: async ({ event, oldEvent, relatedEvents, startDelta, endDelta, revert }) => {
