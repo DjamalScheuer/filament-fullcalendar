@@ -37,13 +37,14 @@ export default function fullcalendar({
     persistedExpandedResources,
     searchConfig,
     droppable,
+    reorderable,
     externalEventContainer,
     externalEventItem,
 }) {
     return {
         init() {
-            // Inject reorder visual feedback styles once
-            if (!document.getElementById('fc-reorder-styles')) {
+            // Inject reorder visual feedback styles once (only when reorderable is enabled)
+            if (reorderable && !document.getElementById('fc-reorder-styles')) {
                 const style = document.createElement('style')
                 style.id = 'fc-reorder-styles'
                 style.textContent = `
@@ -111,10 +112,8 @@ export default function fullcalendar({
 			// Track currently highlighted event id (persist across re-renders)
 			this._highlightedEventId = null
 
-			// Flag to prevent eventDragStop from handling reorder when eventDrop already handled a cross-cell move
+			// Reorder state (only used when reorderable is enabled)
 			this._lastDropHandled = false
-
-			// Reorder visual feedback state
 			this._reorderIndicator = null
 			this._reorderDragHandler = null
 			this._reorderDragEvent = null
@@ -137,14 +136,16 @@ export default function fullcalendar({
                 }
             }
 
-			// Wrap eventOrder to prioritize sort_order from extendedProps
-			const userEventOrder = sanitizedConfig.eventOrder
-			sanitizedConfig.eventOrder = function(a, b) {
-				const orderA = a.extendedProps?.sort_order ?? 999999
-				const orderB = b.extendedProps?.sort_order ?? 999999
-				if (orderA !== orderB) return orderA - orderB
-				if (typeof userEventOrder === 'function') return userEventOrder(a, b)
-				return 0
+			// Wrap eventOrder to prioritize sort_order from extendedProps (only when reorderable)
+			if (reorderable) {
+				const userEventOrder = sanitizedConfig.eventOrder
+				sanitizedConfig.eventOrder = function(a, b) {
+					const orderA = a.extendedProps?.sort_order ?? 999999
+					const orderB = b.extendedProps?.sort_order ?? 999999
+					if (orderA !== orderB) return orderA - orderB
+					if (typeof userEventOrder === 'function') return userEventOrder(a, b)
+					return 0
+				}
 			}
 
 			// Preserve user-provided hooks so we can extend them
@@ -271,14 +272,14 @@ export default function fullcalendar({
                     this.$wire.onEventClick(event)
                 },
                 eventDrop: async ({ event, oldEvent, relatedEvents, delta, oldResource, newResource, revert }) => {
-                    this._lastDropHandled = true
+                    if (reorderable) this._lastDropHandled = true
                     const shouldRevert = await this.$wire.onEventDrop(event, oldEvent, relatedEvents, delta, oldResource, newResource)
 
                     if (typeof shouldRevert === 'boolean' && shouldRevert) {
                         revert()
                     }
                 },
-                eventDragStart: ({ event }) => {
+                eventDragStart: !reorderable ? undefined : ({ event }) => {
                     this._reorderDragEvent = event
                     const resources = event.getResources()
                     const resourceId = resources.length > 0 ? resources[0].id : null
@@ -306,11 +307,26 @@ export default function fullcalendar({
                     if (siblings.length === 0) return
 
                     siblings.sort((a, b) => a.top - b.top)
+
+                    const harness = siblings[0].el.closest('.fc-timeline-event-harness')
                     const laneEl = siblings[0].el.closest('.fc-timeline-lane-frame') || siblings[0].el.parentElement
+
+                    let slotLeft, slotWidth
+                    if (harness) {
+                        const harnessRect = harness.getBoundingClientRect()
+                        const laneRect = laneEl.getBoundingClientRect()
+                        slotLeft = harnessRect.left - laneRect.left
+                        slotWidth = harnessRect.width
+                    }
 
                     const indicator = document.createElement('div')
                     indicator.className = 'fc-reorder-indicator'
                     indicator.style.display = 'none'
+                    if (slotLeft !== undefined) {
+                        indicator.style.left = slotLeft + 'px'
+                        indicator.style.width = slotWidth + 'px'
+                        indicator.style.right = 'auto'
+                    }
                     if (laneEl) {
                         laneEl.style.position = 'relative'
                         laneEl.appendChild(indicator)
@@ -320,11 +336,13 @@ export default function fullcalendar({
                     this._reorderDragHandler = (moveEvent) => {
                         const mouseY = moveEvent.clientY
                         const laneRect = laneEl.getBoundingClientRect()
+                        const slotStartX = laneRect.left + (slotLeft ?? 0)
+                        const slotEndX = slotStartX + (slotWidth ?? laneRect.width)
 
-                        let isOverLane = mouseY >= laneRect.top && mouseY <= laneRect.bottom &&
-                            moveEvent.clientX >= laneRect.left && moveEvent.clientX <= laneRect.right
+                        let isOverSlot = mouseY >= laneRect.top && mouseY <= laneRect.bottom &&
+                            moveEvent.clientX >= slotStartX && moveEvent.clientX <= slotEndX
 
-                        if (!isOverLane) {
+                        if (!isOverSlot) {
                             indicator.style.display = 'none'
                             return
                         }
@@ -349,7 +367,7 @@ export default function fullcalendar({
 
                     document.addEventListener('mousemove', this._reorderDragHandler)
                 },
-                eventDragStop: ({ event, jsEvent }) => {
+                eventDragStop: !reorderable ? undefined : ({ event, jsEvent }) => {
                     if (this._reorderDragHandler) {
                         document.removeEventListener('mousemove', this._reorderDragHandler)
                         this._reorderDragHandler = null

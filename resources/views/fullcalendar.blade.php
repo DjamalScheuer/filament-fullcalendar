@@ -66,6 +66,7 @@
                 persistedExpandedResources: @js($this->getPersistedExpandedResources()),
                 searchConfig: @js($this->getSearchConfig()),
                 droppable: @json($plugin->isDroppable()),
+                reorderable: @json($plugin->isReorderable()),
                 externalEventContainer: @js($plugin->getExternalEventContainer()),
                 externalEventItem: @js($plugin->getExternalEventItem()),
             })">

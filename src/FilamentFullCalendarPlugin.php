@@ -23,6 +23,8 @@ class FilamentFullCalendarPlugin implements Plugin
 
     protected ?bool $droppable = null;
 
+    protected ?bool $reorderable = null;
+
     protected ?string $externalEventContainer = null;
 
     protected ?string $externalEventItem = null;
@@ -148,6 +150,18 @@ class FilamentFullCalendarPlugin implements Plugin
     public function isDroppable(): bool
     {
         return $this->droppable ?? false;
+    }
+
+    public function reorderable(bool $reorderable = true): static
+    {
+        $this->reorderable = $reorderable;
+
+        return $this;
+    }
+
+    public function isReorderable(): bool
+    {
+        return $this->reorderable ?? false;
     }
 
     public function getExternalEventContainer(): ?string
