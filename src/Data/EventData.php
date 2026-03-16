@@ -33,6 +33,8 @@ class EventData implements Arrayable
 
     protected ?string $textColor = null;
 
+    protected ?int $sortOrder = null;
+
     protected ?array $extendedProps = null;
 
     protected array $extraProperties = [];
@@ -166,6 +168,17 @@ class EventData implements Arrayable
     }
 
     /**
+     * Controls the visual ordering of events within the same time slot.
+     * Lower values appear first. Used with the onEventReorder drag & drop feature.
+     */
+    public function sortOrder(int $sortOrder): static
+    {
+        $this->sortOrder = $sortOrder;
+
+        return $this;
+    }
+
+    /**
      * A plain object holding miscellaneous other properties specified during parsing.
      * Receives properties in the explicitly given extendedProps hash as well as other non-standard properties.
      */
@@ -201,7 +214,10 @@ class EventData implements Arrayable
             ...$this->backgroundColor ? ['backgroundColor' => $this->backgroundColor] : [],
             ...$this->borderColor ? ['borderColor' => $this->borderColor] : [],
             ...$this->textColor ? ['textColor' => $this->textColor] : [],
-            ...$this->extendedProps ? ['extendedProps' => $this->extendedProps] : [],
+            ...($this->extendedProps || $this->sortOrder !== null) ? ['extendedProps' => array_merge(
+                $this->extendedProps ?? [],
+                $this->sortOrder !== null ? ['sort_order' => $this->sortOrder] : [],
+            )] : [],
             ...$this->extraProperties,
         ];
     }

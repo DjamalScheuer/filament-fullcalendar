@@ -124,6 +124,21 @@ trait InteractsWithEvents
         ]);
     }
 
+    /**
+     * Triggered when an event is reordered within the same slot via drag & drop.
+     * Override this method to persist the new sort order.
+     *
+     * @param string $eventId The ID of the event that was dragged.
+     * @param array $orderedEventIds All event IDs in the slot, in their new visual order.
+     * @param ?array $resource The resource the events belong to.
+     * @param ?string $date The date (YYYY-MM-DD) of the slot.
+     * @return void
+     */
+    public function onEventReorder(string $eventId, array $orderedEventIds, ?array $resource, ?string $date): void
+    {
+        //
+    }
+
     public function refreshRecords(): void
     {
         $this->dispatch('filament-fullcalendar--refresh');

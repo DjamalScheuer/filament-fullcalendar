@@ -69,6 +69,9 @@ export default function fullcalendar({
 			// Track currently highlighted event id (persist across re-renders)
 			this._highlightedEventId = null
 
+			// Flag to prevent eventDragStop from handling reorder when eventDrop already handled a cross-cell move
+			this._lastDropHandled = false
+
             // Restore persisted calendar state (view/date/scroll) from sessionStorage
             const storageKey = this.getCalendarStorageKey()
             let savedState = null
@@ -86,6 +89,16 @@ export default function fullcalendar({
                     sanitizedConfig.initialDate = savedState.dateStr
                 }
             }
+
+			// Wrap eventOrder to prioritize sort_order from extendedProps
+			const userEventOrder = sanitizedConfig.eventOrder
+			sanitizedConfig.eventOrder = function(a, b) {
+				const orderA = a.extendedProps?.sort_order ?? 999999
+				const orderB = b.extendedProps?.sort_order ?? 999999
+				if (orderA !== orderB) return orderA - orderB
+				if (typeof userEventOrder === 'function') return userEventOrder(a, b)
+				return 0
+			}
 
 			// Preserve user-provided hooks so we can extend them
 			const userEventClassNames = eventClassNames
@@ -211,11 +224,92 @@ export default function fullcalendar({
                     this.$wire.onEventClick(event)
                 },
                 eventDrop: async ({ event, oldEvent, relatedEvents, delta, oldResource, newResource, revert }) => {
+                    this._lastDropHandled = true
                     const shouldRevert = await this.$wire.onEventDrop(event, oldEvent, relatedEvents, delta, oldResource, newResource)
 
                     if (typeof shouldRevert === 'boolean' && shouldRevert) {
                         revert()
                     }
+                },
+                eventDragStop: ({ event, jsEvent }) => {
+                    this._lastDropHandled = false
+                    const dropMouseY = jsEvent.clientY
+
+                    setTimeout(async () => {
+                        if (this._lastDropHandled) return
+
+                        const resources = event.getResources()
+                        const resourceId = resources.length > 0 ? resources[0].id : null
+                        const eventStartDate = event.startStr ? event.startStr.substring(0, 10) : null
+                        if (!eventStartDate) return
+
+                        const allEvents = calendar.getEvents()
+                        const sameSlotEvents = allEvents.filter(e => {
+                            const eResources = e.getResources()
+                            const eResourceId = eResources.length > 0 ? eResources[0].id : null
+                            const eStartDate = e.startStr ? e.startStr.substring(0, 10) : null
+                            return eResourceId === resourceId && eStartDate === eventStartDate
+                        })
+
+                        if (sameSlotEvents.length <= 1) return
+
+                        const siblingPositions = []
+                        for (const sib of sameSlotEvents) {
+                            if (String(sib.id) === String(event.id)) continue
+                            const el = this.$el.querySelector(`[data-event-id="${sib.id}"]`)
+                            if (!el) continue
+                            const rect = el.getBoundingClientRect()
+                            siblingPositions.push({
+                                id: String(sib.id),
+                                top: rect.top,
+                                midY: rect.top + rect.height / 2,
+                                sortOrder: sib.extendedProps?.sort_order ?? 999999,
+                            })
+                        }
+
+                        if (siblingPositions.length === 0) return
+
+                        siblingPositions.sort((a, b) => a.top - b.top)
+
+                        let insertIndex = siblingPositions.length
+                        for (let i = 0; i < siblingPositions.length; i++) {
+                            if (dropMouseY < siblingPositions[i].midY) {
+                                insertIndex = i
+                                break
+                            }
+                        }
+
+                        const orderedIds = siblingPositions.map(s => s.id)
+                        orderedIds.splice(insertIndex, 0, String(event.id))
+
+                        const currentOrder = sameSlotEvents
+                            .map(e => ({
+                                id: String(e.id),
+                                sortOrder: e.extendedProps?.sort_order ?? 999999,
+                            }))
+                            .sort((a, b) => a.sortOrder - b.sortOrder)
+                            .map(e => e.id)
+
+                        const orderChanged = orderedIds.length !== currentOrder.length ||
+                            orderedIds.some((id, i) => id !== currentOrder[i])
+
+                        if (!orderChanged) return
+
+                        const resource = resourceId ? {
+                            id: resources[0].id,
+                            title: resources[0].title,
+                            extendedProps: resources[0].extendedProps,
+                        } : null
+
+                        await this.$wire.onEventReorder(
+                            String(event.id),
+                            orderedIds,
+                            resource,
+                            eventStartDate
+                        )
+
+                        calendar.refetchEvents()
+                    }, 150)
                 },
                 eventResize: async ({ event, oldEvent, relatedEvents, startDelta, endDelta, revert }) => {
                     const shouldRevert = await this.$wire.onEventResize(event, oldEvent, relatedEvents, startDelta, endDelta)
