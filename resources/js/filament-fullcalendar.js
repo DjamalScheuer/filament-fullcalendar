@@ -98,6 +98,11 @@ export default function fullcalendar({
             if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'kwDropdown')) {
                 delete sanitizedConfig.kwDropdown
             }
+            // Allow widget-level config to override plugin-level reorderable
+            if (Object.prototype.hasOwnProperty.call(sanitizedConfig, 'reorderable')) {
+                reorderable = sanitizedConfig.reorderable
+                delete sanitizedConfig.reorderable
+            }
 
             // Apply resourceAreaColumnCellContent callback to all resourceAreaColumns if provided
             if (resourceAreaColumnCellContent && typeof resourceAreaColumnCellContent === 'function') {
