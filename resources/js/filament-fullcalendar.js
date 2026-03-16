@@ -42,6 +42,48 @@ export default function fullcalendar({
 }) {
     return {
         init() {
+            // Inject reorder visual feedback styles once
+            if (!document.getElementById('fc-reorder-styles')) {
+                const style = document.createElement('style')
+                style.id = 'fc-reorder-styles'
+                style.textContent = `
+                    .fc-reorder-indicator {
+                        position: absolute;
+                        left: 0;
+                        right: 0;
+                        height: 3px;
+                        background: rgba(var(--primary-500), 1);
+                        border-radius: 2px;
+                        z-index: 9999;
+                        pointer-events: none;
+                        box-shadow: 0 0 6px rgba(var(--primary-500), 0.6);
+                        transition: top 0.08s ease;
+                    }
+                    .fc-reorder-indicator::before,
+                    .fc-reorder-indicator::after {
+                        content: '';
+                        position: absolute;
+                        top: 50%;
+                        width: 8px;
+                        height: 8px;
+                        background: rgba(var(--primary-500), 1);
+                        border-radius: 50%;
+                        transform: translateY(-50%);
+                    }
+                    .fc-reorder-indicator::before { left: -2px; }
+                    .fc-reorder-indicator::after { right: -2px; }
+                    .fc-event-reordered {
+                        animation: fc-reorder-flash 0.6s ease-out;
+                    }
+                    @keyframes fc-reorder-flash {
+                        0% { box-shadow: 0 0 0 0 rgba(var(--primary-500), 0.7); }
+                        40% { box-shadow: 0 0 12px 4px rgba(var(--primary-500), 0.5); }
+                        100% { box-shadow: none; }
+                    }
+                `
+                document.head.appendChild(style)
+            }
+
             // Remove any non-FullCalendar options from config to avoid runtime warnings
             const sanitizedConfig = { ...(config || {}) }
             if (sanitizedConfig && Object.prototype.hasOwnProperty.call(sanitizedConfig, 'search')) {
