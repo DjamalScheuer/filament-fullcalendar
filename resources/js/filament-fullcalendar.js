@@ -123,6 +123,18 @@ export default function fullcalendar({
 			this._reorderDragHandler = null
 			this._reorderDragEvent = null
 
+			// Helper: do two FullCalendar events overlap in time?
+			// Treats missing end as: end-of-start-day for all-day events, else equal to start.
+			const eventsOverlap = (a, b) => {
+				const aStart = a.start
+				const bStart = b.start
+				if (!aStart || !bStart) return false
+				const dayMs = 86400000
+				const aEnd = a.end || new Date(aStart.getTime() + (a.allDay ? dayMs : 0))
+				const bEnd = b.end || new Date(bStart.getTime() + (b.allDay ? dayMs : 0))
+				return aStart < bEnd && bStart < aEnd
+			}
+
             // Restore persisted calendar state (view/date/scroll) from sessionStorage
             const storageKey = this.getCalendarStorageKey()
             let savedState = null
@@ -288,14 +300,14 @@ export default function fullcalendar({
                     this._reorderDragEvent = event
                     const resources = event.getResources()
                     const resourceId = resources.length > 0 ? resources[0].id : null
-                    const eventStartDate = event.startStr ? event.startStr.substring(0, 10) : null
 
                     const allEvents = calendar.getEvents()
+                    // Reorder candidates: events of the same resource that overlap in time
+                    // with the dragged event (formerly: events starting on the exact same date)
                     const sameSlotEvents = allEvents.filter(e => {
                         const eRes = e.getResources()
                         const eResId = eRes.length > 0 ? eRes[0].id : null
-                        const eDate = e.startStr ? e.startStr.substring(0, 10) : null
-                        return eResId === resourceId && eDate === eventStartDate
+                        return eResId === resourceId && eventsOverlap(event, e)
                     })
 
                     if (sameSlotEvents.length <= 1) return
@@ -315,13 +327,20 @@ export default function fullcalendar({
 
                     const harness = siblings[0].el.closest('.fc-timeline-event-harness')
                     const laneEl = siblings[0].el.closest('.fc-timeline-lane-frame') || siblings[0].el.parentElement
+                    // If all siblings sit in the same harness (Same-Day reorder), constrain
+                    // the indicator to that slot. Otherwise (Cross-Day overlap reorder), let
+                    // it span the whole resource lane so the user can drop anywhere.
+                    const allSameSlot = harness && siblings.every(s => s.el.closest('.fc-timeline-event-harness') === harness)
+                    const laneRect = laneEl.getBoundingClientRect()
 
                     let slotLeft, slotWidth
-                    if (harness) {
+                    if (allSameSlot && harness) {
                         const harnessRect = harness.getBoundingClientRect()
-                        const laneRect = laneEl.getBoundingClientRect()
                         slotLeft = harnessRect.left - laneRect.left
                         slotWidth = harnessRect.width
+                    } else {
+                        slotLeft = 0
+                        slotWidth = laneRect.width
                     }
 
                     const indicator = document.createElement('div')
@@ -395,11 +414,12 @@ export default function fullcalendar({
                         if (!eventStartDate) return
 
                         const allEvents = calendar.getEvents()
+                        // Mirror the eventDragStart filter: events of the same resource that
+                        // overlap in time with the dragged event (formerly: same-day only).
                         const sameSlotEvents = allEvents.filter(e => {
                             const eResources = e.getResources()
                             const eResourceId = eResources.length > 0 ? eResources[0].id : null
-                            const eStartDate = e.startStr ? e.startStr.substring(0, 10) : null
-                            return eResourceId === resourceId && eStartDate === eventStartDate
+                            return eResourceId === resourceId && eventsOverlap(event, e)
                         })
 
                         if (sameSlotEvents.length <= 1) return
